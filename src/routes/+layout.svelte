@@ -6,14 +6,11 @@
 		label: string;
 		href: string;
 		icon: string;
-		disabled: boolean;
 	}
 
 	const navItems: NavItem[] = [
-		{ label: 'Etusivu', href: '/', icon: '🏠', disabled: false },
-		{ label: 'Iltavahti', href: '/iltavahti', icon: '🌙', disabled: true },
-		{ label: 'Aamurituaali', href: '/aamurituaali', icon: '☀️', disabled: true },
-		{ label: 'Asetukset', href: '/asetukset', icon: '⚙️', disabled: false }
+		{ label: 'Fokus', href: '/', icon: '◉' },
+		{ label: 'Asetukset', href: '/asetukset', icon: '⌘' }
 	];
 
 	let { children } = $props();
@@ -26,22 +23,14 @@
 
 	<nav class="tab-bar">
 		{#each navItems as item}
-			{#if item.disabled}
-				<div class="tab-item disabled">
-					<span class="tab-icon">{item.icon}</span>
-					<span class="tab-label">{item.label}</span>
-					<span class="tab-badge">Tulossa</span>
-				</div>
-			{:else}
-				<a
-					href={item.href}
-					class="tab-item"
-					class:active={$page.url.pathname === item.href}
-				>
-					<span class="tab-icon">{item.icon}</span>
-					<span class="tab-label">{item.label}</span>
-				</a>
-			{/if}
+			<a
+				href={item.href}
+				class="tab-item"
+				class:active={$page.url.pathname === item.href}
+			>
+				<span class="tab-icon">{item.icon}</span>
+				<span class="tab-label">{item.label}</span>
+			</a>
 		{/each}
 	</nav>
 </div>
@@ -76,7 +65,7 @@
 	}
 
 	.tab-bar > :global(*) {
-		max-width: calc(var(--max-width) / 4);
+		max-width: calc(var(--max-width) / 2);
 	}
 
 	.tab-item {
@@ -98,24 +87,14 @@
 		color: var(--accent);
 	}
 
-	.tab-item.disabled {
-		opacity: 0.4;
-		cursor: default;
-	}
-
 	.tab-icon {
-		font-size: 1.25rem;
+		font-size: 1.1rem;
 		line-height: 1;
+		font-weight: 700;
 	}
 
 	.tab-label {
-		font-weight: 500;
-	}
-
-	.tab-badge {
-		font-size: 0.5rem;
-		color: var(--text-muted);
-		position: absolute;
-		bottom: 0.15rem;
+		font-weight: 600;
+		letter-spacing: 0.02em;
 	}
 </style>

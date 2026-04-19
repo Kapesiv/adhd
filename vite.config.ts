@@ -7,12 +7,9 @@ export default defineConfig({
 		sveltekit(),
 		SvelteKitPWA({
 			registerType: 'autoUpdate',
-			manifest: false, // We use our own static/manifest.json
+			manifest: false,
 			workbox: {
-				globPatterns: ['**/*.{js,css,html,ico,png,svg,webp,woff,woff2}']
-			},
-			devOptions: {
-				enabled: true
+				globPatterns: ['client/**/*.{js,css,html,ico,png,svg,webp,woff,woff2}']
 			}
 		})
 	]
