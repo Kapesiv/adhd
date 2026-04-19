@@ -2,15 +2,16 @@
 	import '../app.css';
 	import { page } from '$app/stores';
 	import { browser } from '$app/environment';
+	import { base } from '$app/paths';
 
 	if (browser && 'serviceWorker' in navigator) {
-		navigator.serviceWorker.register('/sw.js');
+		navigator.serviceWorker.register(`${base}/sw.js`);
 	}
 
 	const navItems = [
-		{ label: 'Koti', href: '/' },
-		{ label: 'Iltavahti', href: '/iltavahti' },
-		{ label: 'Asetukset', href: '/asetukset' }
+		{ label: 'Koti', href: `${base}/` },
+		{ label: 'Iltavahti', href: `${base}/iltavahti` },
+		{ label: 'Asetukset', href: `${base}/asetukset` }
 	];
 
 	let { children } = $props();

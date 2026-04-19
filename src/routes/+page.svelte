@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { iltavahti } from '$lib/iltavahti';
+	import { base } from '$app/paths';
 </script>
 
 <svelte:head>
@@ -9,7 +9,7 @@
 <div class="page">
 	<h1>Terve.</h1>
 
-	<a href="/iltavahti" class="card">
+	<a href="{base}/iltavahti" class="card">
 		<div>
 			<h2>Iltavahti</h2>
 			<p>Iltatoimet listana, kello käy.</p>

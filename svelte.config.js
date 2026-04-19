@@ -10,7 +10,10 @@ const config = {
 			pages: 'build',
 			assets: 'build',
 			fallback: '404.html'
-		})
+		}),
+		paths: {
+			base: '/adhd'
+		}
 	}
 };
 
