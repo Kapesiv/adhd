@@ -57,13 +57,14 @@
 		flex-direction: column;
 		min-height: 100vh;
 		min-height: 100dvh;
-		max-width: var(--max-width);
-		margin: 0 auto;
 	}
 
 	.content {
 		flex: 1;
-		padding: 1.5rem 1rem;
+		width: 100%;
+		max-width: var(--max-width);
+		margin: 0 auto;
+		padding: 1.5rem 2rem;
 		padding-bottom: 5.5rem;
 	}
 
@@ -80,23 +81,17 @@
 		z-index: 100;
 	}
 
-	.tab-bar > :global(*) {
-		max-width: calc(var(--max-width) / 4);
-	}
-
 	.tab-item {
-		flex: 1;
 		display: flex;
 		flex-direction: column;
 		align-items: center;
 		gap: 0.15rem;
-		padding: 0.5rem 0.25rem 0.4rem;
+		padding: 0.5rem 1.5rem 0.4rem;
 		text-decoration: none;
 		color: var(--text-muted);
-		font-size: 0.65rem;
+		font-size: 0.7rem;
 		transition: color 0.15s;
 		position: relative;
-		max-width: 125px;
 	}
 
 	.tab-item.active {
@@ -122,5 +117,18 @@
 		color: var(--text-muted);
 		position: absolute;
 		bottom: 0.15rem;
+	}
+
+	@media (max-width: 640px) {
+		.content {
+			padding: 1rem;
+			padding-bottom: 5rem;
+		}
+
+		.tab-item {
+			flex: 1;
+			padding: 0.5rem 0.25rem 0.4rem;
+			font-size: 0.65rem;
+		}
 	}
 </style>

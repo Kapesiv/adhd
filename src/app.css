@@ -1,18 +1,13 @@
 :root {
-	--bg: #0b1020;
-	--bg-card: #131a2d;
-	--bg-nav: rgb(9 14 26 / 0.92);
-	--field: #0f1729;
-	--pill: rgb(255 255 255 / 0.05);
-	--text: #eef2ff;
-	--text-soft: #c6d0f5;
-	--text-muted: #8d99bb;
+	--bg: #0f1115;
+	--bg-card: #1a1d23;
+	--bg-nav: #161920;
+	--text: #e4e4e7;
+	--text-muted: #71717a;
 	--accent: #f97316;
-	--accent-strong: #ea580c;
-	--accent-soft: #ffb480;
-	--accent-dim: rgb(249 115 22 / 0.18);
-	--border: rgb(148 163 184 / 0.16);
-	--max-width: 500px;
+	--accent-dim: #f9731633;
+	--border: #27272a;
+	--max-width: 1200px;
 }
 
 * {
@@ -23,27 +18,13 @@
 
 html, body {
 	height: 100%;
-	background:
-		radial-gradient(circle at top, rgb(249 115 22 / 0.14), transparent 28%),
-		radial-gradient(circle at bottom left, rgb(59 130 246 / 0.16), transparent 24%),
-		var(--bg);
+	background: var(--bg);
 	color: var(--text);
-	font-family: 'IBM Plex Sans', 'Segoe UI', system-ui, sans-serif;
+	font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
 	-webkit-font-smoothing: antialiased;
 	-webkit-tap-highlight-color: transparent;
 }
 
 body {
 	padding-bottom: env(safe-area-inset-bottom, 0);
-}
-
-a {
-	color: inherit;
-}
-
-button,
-input,
-select,
-textarea {
-	font: inherit;
 }
