@@ -114,7 +114,7 @@ function createIltavahtiStore() {
 
 export const iltavahti = createIltavahtiStore();
 
-// Wake lock - pitää näytön päällä
+// ── Wake Lock ──
 let wakeLock: WakeLockSentinel | null = null;
 
 export async function requestWakeLock() {
@@ -122,9 +122,15 @@ export async function requestWakeLock() {
 	try {
 		if ('wakeLock' in navigator) {
 			wakeLock = await navigator.wakeLock.request('screen');
+			// iOS voi vapauttaa lockin kun tabi menee taustalle, ota takaisin
+			document.addEventListener('visibilitychange', async () => {
+				if (document.visibilityState === 'visible' && !wakeLock) {
+					wakeLock = await navigator.wakeLock.request('screen');
+				}
+			});
 		}
 	} catch {
-		// Ei tuettu tai käyttäjä esti
+		// Ei tuettu tai epäonnistui
 	}
 }
 
@@ -133,34 +139,121 @@ export function releaseWakeLock() {
 	wakeLock = null;
 }
 
-// Hälytysääni Web Audio API:lla
+// ── Ääni ──
 let audioCtx: AudioContext | null = null;
+let alarmInterval: ReturnType<typeof setInterval> | null = null;
 
 export function initAudio() {
-	if (!browser) return;
-	if (!audioCtx) {
-		audioCtx = new AudioContext();
+	if (!browser || audioCtx) return;
+	audioCtx = new AudioContext();
+}
+
+function beep(freq: number, duration: number, delay: number) {
+	if (!audioCtx) return;
+	const t = audioCtx.currentTime + delay;
+	const osc = audioCtx.createOscillator();
+	const gain = audioCtx.createGain();
+	osc.connect(gain);
+	gain.connect(audioCtx.destination);
+	osc.frequency.value = freq;
+	osc.type = 'sine';
+	gain.gain.setValueAtTime(0.4, t);
+	gain.gain.exponentialRampToValueAtTime(0.01, t + duration);
+	osc.start(t);
+	osc.stop(t + duration);
+}
+
+export function playTick() {
+	if (!audioCtx) return;
+	beep(900, 0.06, 0);
+}
+
+// Jatkuva hälytys — toistetaan kunnes pysäytetään
+export function startAlarm() {
+	if (alarmInterval) return;
+
+	function ring() {
+		beep(520, 0.15, 0);
+		beep(680, 0.15, 0.2);
+		beep(520, 0.15, 0.4);
+		beep(680, 0.2, 0.6);
+	}
+
+	ring();
+	alarmInterval = setInterval(ring, 2000);
+}
+
+export function stopAlarm() {
+	if (alarmInterval) {
+		clearInterval(alarmInterval);
+		alarmInterval = null;
 	}
 }
 
-export function playAlarm() {
-	if (!audioCtx) return;
-
-	const now = audioCtx.currentTime;
-
-	// Kolme nousevaa ääntä
-	for (let i = 0; i < 3; i++) {
-		const osc = audioCtx.createOscillator();
-		const gain = audioCtx.createGain();
-		osc.connect(gain);
-		gain.connect(audioCtx.destination);
-
-		osc.frequency.value = 440 + i * 120;
-		osc.type = 'sine';
-		gain.gain.value = 0.3;
-		gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3 + i * 0.35);
-
-		osc.start(now + i * 0.35);
-		osc.stop(now + 0.3 + i * 0.35);
+// ── Haptic ──
+export function haptic() {
+	if (!browser) return;
+	try {
+		if ('vibrate' in navigator) {
+			navigator.vibrate(30);
+		}
+	} catch {
+		// iOS ei tue, mutta ei haittaa
 	}
+}
+
+export function hapticHeavy() {
+	if (!browser) return;
+	try {
+		if ('vibrate' in navigator) {
+			navigator.vibrate([50, 30, 50]);
+		}
+	} catch {
+		// iOS ei tue
+	}
+}
+
+// ── Liiketunnistin ──
+type MotionCallback = () => void;
+let motionCallback: MotionCallback | null = null;
+let motionListening = false;
+let lastMotionTime = 0;
+
+function handleMotion(e: DeviceMotionEvent) {
+	const acc = e.accelerationIncludingGravity;
+	if (!acc || !motionCallback) return;
+
+	const total = Math.sqrt((acc.x ?? 0) ** 2 + (acc.y ?? 0) ** 2 + (acc.z ?? 0) ** 2);
+	// Normaali paikallaan ~9.8, liike nostaa arvon yli 12
+	const now = Date.now();
+	if (total > 13 && now - lastMotionTime > 3000) {
+		lastMotionTime = now;
+		motionCallback();
+	}
+}
+
+export async function startMotionDetection(callback: MotionCallback) {
+	if (!browser || motionListening) return;
+
+	// iOS vaatii luvan
+	const DME = typeof window !== 'undefined' ? (window as any).DeviceMotionEvent : null;
+	if (DME && typeof DME.requestPermission === 'function') {
+		try {
+			const perm = await DME.requestPermission();
+			if (perm !== 'granted') return;
+		} catch {
+			return;
+		}
+	}
+
+	motionCallback = callback;
+	motionListening = true;
+	window.addEventListener('devicemotion', handleMotion);
+}
+
+export function stopMotionDetection() {
+	if (!browser) return;
+	motionListening = false;
+	motionCallback = null;
+	window.removeEventListener('devicemotion', handleMotion);
 }

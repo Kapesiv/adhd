@@ -1,27 +1,36 @@
 <svelte:options runes={false} />
 
 <script lang="ts">
-	import { iltavahti, requestWakeLock, releaseWakeLock, initAudio, playAlarm } from '$lib/iltavahti';
-	import { onDestroy, onMount } from 'svelte';
+	import {
+		iltavahti,
+		requestWakeLock, releaseWakeLock,
+		initAudio, playTick, startAlarm, stopAlarm,
+		haptic, hapticHeavy,
+		startMotionDetection, stopMotionDetection
+	} from '$lib/iltavahti';
+	import { onDestroy } from 'svelte';
 
 	let now = new Date();
 	const timer = setInterval(() => (now = new Date()), 1000);
+
 	onDestroy(() => {
 		clearInterval(timer);
 		releaseWakeLock();
+		stopAlarm();
+		stopMotionDetection();
 	});
 
 	let started = false;
-	let alarmPlayed = false;
+	let alarmActive = false;
+	let phonePickedUp = false;
+	let pickupTimeout: ReturnType<typeof setTimeout> | null = null;
 
 	$: state = $iltavahti;
 	$: remaining = state.tasks.filter((t) => !t.done);
 	$: currentTask = remaining[0] ?? null;
 	$: doneCount = state.tasks.length - remaining.length;
 	$: allDone = state.tasks.length > 0 && remaining.length === 0;
-	$: stepLabel = allDone
-		? ''
-		: `${doneCount + 1} / ${state.tasks.length}`;
+	$: stepLabel = allDone ? '' : `${doneCount + 1} / ${state.tasks.length}`;
 
 	$: bedtimeParts = state.bedtime.split(':').map(Number);
 	$: bedtimeToday = (() => {
@@ -34,15 +43,16 @@
 	$: countdownText = (() => {
 		if (minutesLeft <= 0) {
 			const over = Math.abs(minutesLeft);
-			if (over < 60) return `+${over} min yli`;
-			return `+${Math.floor(over / 60)} h ${over % 60} min yli`;
+			if (over < 60) return `+${over}`;
+			return `+${Math.floor(over / 60)}:${String(over % 60).padStart(2, '0')}`;
 		}
-		if (minutesLeft < 60) return `${minutesLeft} min`;
+		if (minutesLeft < 60) return String(minutesLeft);
 		const h = Math.floor(minutesLeft / 60);
 		const m = minutesLeft % 60;
-		if (m === 0) return `${h} h`;
-		return `${h} h ${m} min`;
+		return `${h}:${String(m).padStart(2, '0')}`;
 	})();
+
+	$: countdownUnit = minutesLeft <= 0 ? 'min yli' : minutesLeft < 60 ? 'min' : 'h';
 
 	$: urgency = (() => {
 		if (minutesLeft <= 0) return 'past';
@@ -51,23 +61,62 @@
 		return 'ok';
 	})();
 
-	// Soita hälytys kun aika menee yli
-	$: if (started && minutesLeft <= 0 && !alarmPlayed && !allDone) {
-		playAlarm();
-		alarmPlayed = true;
+	// Himmennyslevel 0-0.6 — mitä lähempänä nukkumista, sitä tummempi
+	$: dimLevel = (() => {
+		if (!started) return 0;
+		if (allDone) return 0.5;
+		if (minutesLeft <= 0) return 0;
+		if (minutesLeft >= 60) return 0;
+		return Math.min(0.4, (1 - minutesLeft / 60) * 0.4);
+	})();
+
+	// Hälytys kun aika menee yli
+	$: if (started && minutesLeft <= 0 && !allDone && !alarmActive) {
+		alarmActive = true;
+		startAlarm();
+	}
+
+	// Sammuta hälytys kun kaikki tehty
+	$: if (allDone && alarmActive) {
+		alarmActive = false;
+		stopAlarm();
 	}
 
 	function start() {
 		started = true;
-		alarmPlayed = false;
+		alarmActive = false;
 		initAudio();
 		requestWakeLock();
 	}
 
 	function complete() {
-		if (currentTask) {
-			iltavahti.markDone(currentTask.id);
+		if (!currentTask) return;
+		haptic();
+		playTick();
+		iltavahti.markDone(currentTask.id);
+
+		// Jos tämä oli viimeinen, siirry yöpöytäkellotilaan
+		if (remaining.length <= 1) {
+			stopAlarm();
+			enterNightMode();
 		}
+	}
+
+	function dismissAlarm() {
+		stopAlarm();
+		alarmActive = false;
+		hapticHeavy();
+	}
+
+	function enterNightMode() {
+		startMotionDetection(() => {
+			phonePickedUp = true;
+			hapticHeavy();
+			if (pickupTimeout) clearTimeout(pickupTimeout);
+			pickupTimeout = setTimeout(() => {
+				phonePickedUp = false;
+			}, 4000);
+		});
 	}
 
 	function clock(date: Date) {
@@ -79,18 +128,25 @@
 	<title>Iltavahti</title>
 </svelte:head>
 
+<!-- Himmennyskerros -->
+{#if dimLevel > 0}
+	<div class="dim" style="opacity: {dimLevel}"></div>
+{/if}
+
 {#if !started}
-	<div class="start-screen">
+	<!-- ALOITUS -->
+	<div class="screen">
 		<div class="start-clock">{clock(now)}</div>
-		<p class="start-target">Nukkumaan {state.bedtime}</p>
-		<p class="start-left" class:red={urgency === 'red' || urgency === 'past'} class:yellow={urgency === 'yellow'}>
-			{countdownText}
-		</p>
-		<button class="start-btn" onclick={start}>
+		<div class="start-countdown" class:red={urgency === 'red' || urgency === 'past'} class:yellow={urgency === 'yellow'}>
+			<span class="big-num">{countdownText}</span>
+			<span class="unit">{countdownUnit}</span>
+		</div>
+		<p class="subtle">nukkumaan {state.bedtime}</p>
+		<button class="main-btn" onclick={start}>
 			Aloita iltatoimet
 		</button>
-		<details class="edit-bedtime">
-			<summary>Vaihda aika</summary>
+		<details class="edit">
+			<summary>vaihda aika</summary>
 			<input
 				type="time"
 				value={state.bedtime}
@@ -98,91 +154,193 @@
 			/>
 		</details>
 	</div>
+
 {:else if allDone}
-	<div class="done-screen">
-		<div class="done-clock">{clock(now)}</div>
-		<p class="done-text">Valmis. Laita silmät kiinni.</p>
+	<!-- YÖPÖYTÄKELLO -->
+	<div class="screen night">
+		<div class="night-clock">{clock(now)}</div>
+		{#if phonePickedUp}
+			<p class="pickup-warn">Laita puhelin pois.</p>
+		{:else}
+			<p class="night-text">Silmät kiinni.</p>
+		{/if}
 	</div>
+
 {:else}
-	<div class="task-screen">
+	<!-- YKSI TEHTÄVÄ -->
+	<div class="screen">
 		<div class="countdown" class:red={urgency === 'red' || urgency === 'past'} class:yellow={urgency === 'yellow'}>
-			{countdownText}
+			<span class="big-num">{countdownText}</span>
+			<span class="unit">{countdownUnit}</span>
 		</div>
 
-		<div class="step">{stepLabel}</div>
+		<p class="step">{stepLabel}</p>
 
-		<div class="current-task">{currentTask?.label}</div>
+		<h1 class="task-name">{currentTask?.label}</h1>
 
-		<button class="done-btn" onclick={complete}>
+		{#if alarmActive}
+			<button class="alarm-dismiss" onclick={dismissAlarm}>
+				OK, teen nyt
+			</button>
+		{/if}
+
+		<button class="main-btn" onclick={complete}>
 			Tehty
 		</button>
 
-		<div class="rest">
-			{#each remaining.slice(1) as task (task.id)}
-				<span>{task.label}</span>
-			{/each}
-		</div>
+		{#if remaining.length > 1}
+			<div class="upcoming">
+				<p class="upcoming-label">seuraavaksi</p>
+				{#each remaining.slice(1, 3) as task (task.id)}
+					<p>{task.label}</p>
+				{/each}
+			</div>
+		{/if}
 	</div>
 {/if}
 
 <style>
-	/* Aloitusnäkymä */
-	.start-screen {
+	.screen {
 		display: flex;
 		flex-direction: column;
 		align-items: center;
 		justify-content: center;
-		min-height: 70vh;
-		gap: 0.5rem;
+		min-height: 80vh;
 		text-align: center;
+		gap: 0.5rem;
+		position: relative;
+		z-index: 1;
 	}
 
+	/* Himmennyslayer */
+	.dim {
+		position: fixed;
+		inset: 0;
+		background: #000;
+		pointer-events: none;
+		z-index: 50;
+		transition: opacity 2s;
+	}
+
+	/* Aloitus */
 	.start-clock {
-		font-size: 4rem;
-		font-weight: 700;
+		font-size: 1.2rem;
+		color: var(--text-muted);
+		font-variant-numeric: tabular-nums;
+	}
+
+	.start-countdown {
+		margin: 0.5rem 0;
+	}
+
+	/* Kello / countdown iso */
+	.big-num {
+		font-size: 6rem;
+		font-weight: 800;
 		font-variant-numeric: tabular-nums;
 		line-height: 1;
+		display: block;
 	}
 
-	.start-target {
-		font-size: 1rem;
+	.unit {
+		font-size: 1.1rem;
 		color: var(--text-muted);
+		font-weight: 500;
 	}
 
-	.start-left {
-		font-size: 1.5rem;
-		font-weight: 600;
+	.subtle {
+		font-size: 0.85rem;
+		color: var(--text-muted);
 		margin-bottom: 2rem;
 	}
 
-	.start-btn {
+	/* Tehtävänäkymä */
+	.countdown {
+		margin-bottom: 0.5rem;
+	}
+
+	.step {
+		font-size: 0.75rem;
+		color: var(--text-muted);
+		letter-spacing: 0.1em;
+		text-transform: uppercase;
+	}
+
+	.task-name {
+		font-size: 1.8rem;
+		font-weight: 700;
+		margin: 1rem 0 2rem;
+		max-width: 16ch;
+		line-height: 1.2;
+	}
+
+	/* Napit */
+	.main-btn {
 		background: var(--accent);
 		color: white;
 		border: none;
-		border-radius: 0.6rem;
-		padding: 1rem 3rem;
+		border-radius: 1rem;
+		padding: 1.2rem 4rem;
 		font: inherit;
-		font-size: 1.1rem;
+		font-size: 1.2rem;
 		font-weight: 600;
 		cursor: pointer;
 		-webkit-tap-highlight-color: transparent;
+		touch-action: manipulation;
 	}
 
-	.start-btn:active {
-		opacity: 0.8;
+	.main-btn:active {
+		transform: scale(0.97);
 	}
 
-	.edit-bedtime {
-		margin-top: 1.5rem;
+	.alarm-dismiss {
+		background: #f87171;
+		color: white;
+		border: none;
+		border-radius: 1rem;
+		padding: 0.8rem 2rem;
+		font: inherit;
+		font-size: 1rem;
+		font-weight: 600;
+		cursor: pointer;
+		margin-bottom: 1rem;
+		animation: pulse 1s infinite;
+		-webkit-tap-highlight-color: transparent;
+	}
+
+	@keyframes pulse {
+		0%, 100% { opacity: 1; }
+		50% { opacity: 0.6; }
+	}
+
+	.upcoming {
+		margin-top: 3rem;
 		font-size: 0.8rem;
+		color: var(--text-muted);
+		display: flex;
+		flex-direction: column;
+		gap: 0.2rem;
+	}
+
+	.upcoming-label {
+		font-size: 0.65rem;
+		text-transform: uppercase;
+		letter-spacing: 0.1em;
+		margin-bottom: 0.2rem;
+		opacity: 0.6;
+	}
+
+	.edit {
+		margin-top: 1.5rem;
+		font-size: 0.75rem;
 		color: var(--text-muted);
 	}
 
-	.edit-bedtime summary {
+	.edit summary {
 		cursor: pointer;
 	}
 
-	.edit-bedtime input {
+	.edit input {
 		margin-top: 0.5rem;
 		background: var(--field);
 		color: var(--text);
@@ -192,94 +350,38 @@
 		font: inherit;
 	}
 
-	/* Tehtävänäkymä — yksi kerrallaan */
-	.task-screen {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		justify-content: center;
-		min-height: 70vh;
-		text-align: center;
-		gap: 0.75rem;
+	/* Yöpöytäkello */
+	.night {
+		min-height: 90vh;
 	}
 
-	.countdown {
-		font-size: 3rem;
-		font-weight: 700;
-		font-variant-numeric: tabular-nums;
-		line-height: 1;
-		transition: color 0.5s;
-	}
-
-	.step {
-		font-size: 0.8rem;
-		color: var(--text-muted);
-		letter-spacing: 0.05em;
-	}
-
-	.current-task {
-		font-size: 1.6rem;
-		font-weight: 600;
-		margin: 1.5rem 0;
-		max-width: 20ch;
-	}
-
-	.done-btn {
-		background: var(--accent);
-		color: white;
-		border: none;
-		border-radius: 0.6rem;
-		padding: 1.2rem 4rem;
-		font: inherit;
-		font-size: 1.2rem;
-		font-weight: 600;
-		cursor: pointer;
-		margin-bottom: 2rem;
-		-webkit-tap-highlight-color: transparent;
-	}
-
-	.done-btn:active {
-		opacity: 0.8;
-	}
-
-	.rest {
-		display: flex;
-		flex-direction: column;
-		gap: 0.3rem;
-		font-size: 0.8rem;
-		color: var(--text-muted);
-	}
-
-	/* Valmis-näkymä — yöpöytäkello */
-	.done-screen {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		justify-content: center;
-		min-height: 80vh;
-		text-align: center;
-		gap: 1rem;
-	}
-
-	.done-clock {
-		font-size: 5rem;
-		font-weight: 700;
+	.night-clock {
+		font-size: 7rem;
+		font-weight: 800;
 		font-variant-numeric: tabular-nums;
 		line-height: 1;
 		color: var(--text-muted);
+		opacity: 0.4;
 	}
 
-	.done-text {
-		font-size: 1.1rem;
+	.night-text {
+		font-size: 1rem;
 		color: var(--text-muted);
+		opacity: 0.4;
+		margin-top: 0.5rem;
+	}
+
+	.pickup-warn {
+		font-size: 1.3rem;
+		font-weight: 600;
+		color: #f87171;
+		margin-top: 0.5rem;
+		animation: pulse 0.8s infinite;
 	}
 
 	/* Värit */
-	.yellow {
-		color: #fbbf24;
-	}
-
-	.red {
-		color: #f87171;
-	}
+	.yellow { color: #fbbf24; }
+	.yellow .unit { color: #fbbf24; opacity: 0.7; }
+	.red { color: #f87171; }
+	.red .unit { color: #f87171; opacity: 0.7; }
 </style>
