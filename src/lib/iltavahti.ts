@@ -11,6 +11,8 @@ export interface IltavahtiState {
 	bedtime: string;
 	tasks: Task[];
 	lastResetDate: string;
+	// Streak: lista päivämääristä jolloin iltatoimet tehtiin
+	completedDays: string[];
 }
 
 const STORAGE_KEY = 'adhd-iltavahti';
@@ -38,7 +40,8 @@ function seedState(): IltavahtiState {
 	return {
 		bedtime: '23:00',
 		tasks: defaultTasks.map((t) => ({ ...t, id: createId() })),
-		lastResetDate: todayStr()
+		lastResetDate: todayStr(),
+		completedDays: []
 	};
 }
 
@@ -79,10 +82,15 @@ function createIltavahtiStore() {
 		subscribe,
 
 		markDone(taskId: string) {
-			update((s) => ({
-				...s,
-				tasks: s.tasks.map((t) => (t.id === taskId ? { ...t, done: true } : t))
-			}));
+			update((s) => {
+				const newTasks = s.tasks.map((t) => (t.id === taskId ? { ...t, done: true } : t));
+				const allDone = newTasks.every((t) => t.done);
+				const today = todayStr();
+				const days = allDone && !s.completedDays.includes(today)
+					? [...s.completedDays, today]
+					: s.completedDays;
+				return { ...s, tasks: newTasks, completedDays: days };
+			});
 		},
 
 		setBedtime(time: string) {
@@ -113,6 +121,37 @@ function createIltavahtiStore() {
 }
 
 export const iltavahti = createIltavahtiStore();
+
+// Laske putki: montako peräkkäistä päivää taaksepäin (eilen, toissapäivänä...)
+export function getStreak(completedDays: string[]): number {
+	if (completedDays.length === 0) return 0;
+
+	const set = new Set(completedDays);
+	const today = todayStr();
+	let streak = 0;
+	const d = new Date();
+
+	// Jos tänään on tehty, laske tänään mukaan
+	if (set.has(today)) {
+		streak = 1;
+		d.setDate(d.getDate() - 1);
+	} else {
+		// Jos eilen on tehty, aloita siitä (putki ei ole vielä katkennut)
+		d.setDate(d.getDate() - 1);
+		if (!set.has(d.toISOString().slice(0, 10))) return 0;
+	}
+
+	while (set.has(d.toISOString().slice(0, 10))) {
+		streak++;
+		d.setDate(d.getDate() - 1);
+	}
+
+	return streak;
+}
+
+export function isTodayDone(completedDays: string[]): boolean {
+	return completedDays.includes(todayStr());
+}
 
 // ── Wake Lock ──
 let wakeLock: WakeLockSentinel | null = null;
