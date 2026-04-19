@@ -2,10 +2,12 @@
 	--bg: #0f1115;
 	--bg-card: #1a1d23;
 	--bg-nav: #161920;
+	--field: #1a1d23;
+	--pill: rgb(255 255 255 / 0.06);
 	--text: #e4e4e7;
 	--text-muted: #71717a;
 	--accent: #f97316;
-	--accent-dim: #f9731633;
+	--accent-dim: rgb(249 115 22 / 0.15);
 	--border: #27272a;
 	--max-width: 1200px;
 }
@@ -27,4 +29,8 @@ html, body {
 
 body {
 	padding-bottom: env(safe-area-inset-bottom, 0);
+}
+
+a {
+	color: inherit;
 }

@@ -7,18 +7,10 @@
 		navigator.serviceWorker.register('/sw.js');
 	}
 
-	interface NavItem {
-		label: string;
-		href: string;
-		icon: string;
-		disabled: boolean;
-	}
-
-	const navItems: NavItem[] = [
-		{ label: 'Etusivu', href: '/', icon: '🏠', disabled: false },
-		{ label: 'Iltavahti', href: '/iltavahti', icon: '🌙', disabled: false },
-		{ label: 'Aamurituaali', href: '/aamurituaali', icon: '☀️', disabled: true },
-		{ label: 'Asetukset', href: '/asetukset', icon: '⚙️', disabled: false }
+	const navItems = [
+		{ label: 'Koti', href: '/' },
+		{ label: 'Iltavahti', href: '/iltavahti' },
+		{ label: 'Asetukset', href: '/asetukset' }
 	];
 
 	let { children } = $props();
@@ -31,22 +23,13 @@
 
 	<nav class="tab-bar">
 		{#each navItems as item}
-			{#if item.disabled}
-				<div class="tab-item disabled">
-					<span class="tab-icon">{item.icon}</span>
-					<span class="tab-label">{item.label}</span>
-					<span class="tab-badge">Tulossa</span>
-				</div>
-			{:else}
-				<a
-					href={item.href}
-					class="tab-item"
-					class:active={$page.url.pathname === item.href}
-				>
-					<span class="tab-icon">{item.icon}</span>
-					<span class="tab-label">{item.label}</span>
-				</a>
-			{/if}
+			<a
+				href={item.href}
+				class="tab-item"
+				class:active={$page.url.pathname === item.href}
+			>
+				{item.label}
+			</a>
 		{/each}
 	</nav>
 </div>
@@ -64,8 +47,8 @@
 		width: 100%;
 		max-width: var(--max-width);
 		margin: 0 auto;
-		padding: 1.5rem 2rem;
-		padding-bottom: 5.5rem;
+		padding: 2rem;
+		padding-bottom: 5rem;
 	}
 
 	.tab-bar {
@@ -75,60 +58,40 @@
 		right: 0;
 		display: flex;
 		justify-content: center;
+		gap: 2rem;
 		background: var(--bg-nav);
 		border-top: 1px solid var(--border);
-		padding-bottom: env(safe-area-inset-bottom, 0);
+		padding: 0.75rem 1rem;
+		padding-bottom: calc(0.75rem + env(safe-area-inset-bottom, 0));
 		z-index: 100;
 	}
 
 	.tab-item {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		gap: 0.15rem;
-		padding: 0.5rem 1.5rem 0.4rem;
 		text-decoration: none;
 		color: var(--text-muted);
-		font-size: 0.7rem;
+		font-size: 0.85rem;
+		font-weight: 500;
 		transition: color 0.15s;
-		position: relative;
 	}
 
 	.tab-item.active {
-		color: var(--accent);
-	}
-
-	.tab-item.disabled {
-		opacity: 0.4;
-		cursor: default;
-	}
-
-	.tab-icon {
-		font-size: 1.25rem;
-		line-height: 1;
-	}
-
-	.tab-label {
-		font-weight: 500;
-	}
-
-	.tab-badge {
-		font-size: 0.5rem;
-		color: var(--text-muted);
-		position: absolute;
-		bottom: 0.15rem;
+		color: var(--text);
 	}
 
 	@media (max-width: 640px) {
 		.content {
-			padding: 1rem;
+			padding: 1.25rem 1rem;
 			padding-bottom: 5rem;
+		}
+
+		.tab-bar {
+			gap: 0;
 		}
 
 		.tab-item {
 			flex: 1;
-			padding: 0.5rem 0.25rem 0.4rem;
-			font-size: 0.65rem;
+			text-align: center;
+			font-size: 0.8rem;
 		}
 	}
 </style>

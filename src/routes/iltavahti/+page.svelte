@@ -25,11 +25,11 @@
 	$: minutesLeft = Math.floor((bedtimeToday.getTime() - now.getTime()) / 60000);
 
 	$: timeLabel = (() => {
-		if (minutesLeft <= 0) return 'Nukkumaanmenoaika on nyt!';
-		if (minutesLeft < 60) return `${minutesLeft} min jäljellä`;
+		if (minutesLeft <= 0) return 'Aika meni';
+		if (minutesLeft < 60) return `${minutesLeft} min`;
 		const h = Math.floor(minutesLeft / 60);
 		const m = minutesLeft % 60;
-		return `${h} h ${m} min jäljellä`;
+		return `${h} h ${m} min`;
 	})();
 
 	$: urgency = (() => {
@@ -55,54 +55,45 @@
 </svelte:head>
 
 <div class="page">
-	<header class="header">
-		<h1>Iltavahti</h1>
-		<div class="clock" class:urgent={urgency === 'urgent'} class:past={urgency === 'past'}>
+	<header class="top">
+		<div>
+			<h1>Iltavahti</h1>
+			<p class="meta">Nukkumaan {state.bedtime} &middot; {timeLabel}</p>
+		</div>
+		<div class="clock" class:urgent={urgency === 'urgent' || urgency === 'past'}>
 			{clock(now)}
 		</div>
 	</header>
 
-	<section class="bedtime-bar" class:urgent={urgency === 'urgent'} class:past={urgency === 'past'} class:soon={urgency === 'soon'}>
-		<div class="bedtime-info">
-			<span>Nukkumaan {state.bedtime}</span>
-			<span class="time-left">{timeLabel}</span>
-		</div>
-		<div class="progress-track">
-			<div class="progress-fill" style="width: {progress}%"></div>
-		</div>
-		<span class="progress-label">{doneCount}/{totalCount} tehty</span>
-	</section>
+	<div class="bar">
+		<div class="bar-fill" class:urgent={urgency === 'urgent' || urgency === 'past'} style="width: {progress}%"></div>
+	</div>
 
 	{#if allDone}
-		<div class="done-banner">
-			Kaikki tehty! Hyvää yötä.
-		</div>
+		<p class="done">Kaikki tehty. Hyvää yötä.</p>
 	{/if}
 
 	<section class="tasks">
 		{#each state.tasks as task (task.id)}
 			<button
 				type="button"
-				class="task-row"
+				class="task"
 				class:checked={task.done}
 				onclick={() => iltavahti.toggleTask(task.id)}
 			>
-				<span class="checkbox">{task.done ? '✓' : ''}</span>
-				<span class="task-label">{task.label}</span>
+				<span class="check">{task.done ? '✓' : ''}</span>
+				<span class:strike={task.done}>{task.label}</span>
 			</button>
 		{/each}
 	</section>
 
-	<form class="add-row" onsubmit={(e) => { e.preventDefault(); addTask(); }}>
-		<input
-			bind:value={newTask}
-			placeholder="Lisää oma tehtävä..."
-		/>
+	<form class="add" onsubmit={(e) => { e.preventDefault(); addTask(); }}>
+		<input bind:value={newTask} placeholder="Lisää tehtävä..." />
 		<button type="submit" disabled={!newTask.trim()}>+</button>
 	</form>
 
-	<details class="settings-block">
-		<summary>Nukkumaanmenoaika</summary>
+	<details class="bedtime-edit">
+		<summary>Vaihda nukkumaanmenoaika</summary>
 		<input
 			type="time"
 			value={state.bedtime}
@@ -118,197 +109,151 @@
 		gap: 1rem;
 	}
 
-	.header {
+	.top {
 		display: flex;
-		align-items: center;
 		justify-content: space-between;
+		align-items: flex-start;
 	}
 
 	h1 {
-		font-size: 1.5rem;
-		font-weight: 700;
-		letter-spacing: -0.03em;
+		font-size: 1.3rem;
+		font-weight: 600;
+	}
+
+	.meta {
+		font-size: 0.8rem;
+		color: var(--text-muted);
+		margin-top: 0.1rem;
 	}
 
 	.clock {
-		font-size: 1.5rem;
-		font-weight: 700;
+		font-size: 1.4rem;
+		font-weight: 600;
 		font-variant-numeric: tabular-nums;
-		color: var(--text-soft);
+		color: var(--text-muted);
 	}
 
 	.clock.urgent {
-		color: #fbbf24;
-	}
-
-	.clock.past {
 		color: #f87171;
 	}
 
-	.bedtime-bar {
-		background: var(--bg-card);
-		border: 1px solid var(--border);
-		border-radius: 1rem;
-		padding: 0.85rem 1rem;
-		display: flex;
-		flex-direction: column;
-		gap: 0.5rem;
-	}
-
-	.bedtime-bar.soon {
-		border-color: rgb(251 191 36 / 0.3);
-	}
-
-	.bedtime-bar.urgent {
-		border-color: rgb(251 191 36 / 0.5);
-		background: rgb(251 191 36 / 0.06);
-	}
-
-	.bedtime-bar.past {
-		border-color: rgb(248 113 113 / 0.5);
-		background: rgb(248 113 113 / 0.06);
-	}
-
-	.bedtime-info {
-		display: flex;
-		justify-content: space-between;
-		font-size: 0.85rem;
-	}
-
-	.time-left {
-		color: var(--text-muted);
-	}
-
-	.progress-track {
-		height: 6px;
-		background: var(--pill);
-		border-radius: 3px;
+	.bar {
+		height: 4px;
+		background: var(--border);
+		border-radius: 2px;
 		overflow: hidden;
 	}
 
-	.progress-fill {
+	.bar-fill {
 		height: 100%;
 		background: var(--accent);
-		border-radius: 3px;
-		transition: width 0.3s ease;
+		border-radius: 2px;
+		transition: width 0.3s;
 	}
 
-	.progress-label {
-		font-size: 0.7rem;
-		color: var(--text-muted);
-		text-align: right;
+	.bar-fill.urgent {
+		background: #f87171;
 	}
 
-	.done-banner {
-		text-align: center;
-		padding: 1rem;
-		background: rgb(74 222 128 / 0.1);
-		border: 1px solid rgb(74 222 128 / 0.3);
-		border-radius: 1rem;
+	.done {
 		color: #4ade80;
-		font-weight: 600;
+		font-size: 0.9rem;
 	}
 
 	.tasks {
 		display: flex;
 		flex-direction: column;
-		gap: 0.4rem;
+		gap: 0.35rem;
 	}
 
-	.task-row {
+	.task {
 		display: flex;
 		align-items: center;
 		gap: 0.75rem;
-		padding: 0.85rem 1rem;
+		width: 100%;
+		padding: 0.8rem 1rem;
 		background: var(--bg-card);
 		border: 1px solid var(--border);
-		border-radius: 0.85rem;
+		border-radius: 0.6rem;
 		color: var(--text);
-		cursor: pointer;
+		font: inherit;
+		font-size: 0.9rem;
 		text-align: left;
-		transition: opacity 0.15s;
-		width: 100%;
+		cursor: pointer;
 	}
 
-	.task-row.checked {
-		opacity: 0.45;
+	.task.checked {
+		opacity: 0.4;
 	}
 
-	.checkbox {
-		width: 1.5rem;
-		height: 1.5rem;
+	.check {
+		width: 1.3rem;
+		height: 1.3rem;
 		border: 2px solid var(--border);
-		border-radius: 0.4rem;
+		border-radius: 0.3rem;
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		font-size: 0.85rem;
+		font-size: 0.75rem;
 		flex-shrink: 0;
-		color: var(--accent);
 	}
 
-	.task-row.checked .checkbox {
+	.task.checked .check {
 		background: var(--accent);
 		border-color: var(--accent);
 		color: white;
 	}
 
-	.task-label {
-		font-size: 0.95rem;
-	}
-
-	.task-row.checked .task-label {
+	.strike {
 		text-decoration: line-through;
 	}
 
-	.add-row {
+	.add {
 		display: flex;
 		gap: 0.5rem;
 	}
 
-	.add-row input {
+	.add input {
 		flex: 1;
 		background: var(--field);
 		color: var(--text);
 		border: 1px solid var(--border);
-		border-radius: 0.85rem;
-		padding: 0.7rem 0.85rem;
+		border-radius: 0.6rem;
+		padding: 0.65rem 0.85rem;
 		font: inherit;
+		font-size: 0.9rem;
 	}
 
-	.add-row button {
-		background: var(--accent);
-		color: white;
-		border: none;
-		border-radius: 0.85rem;
-		width: 2.8rem;
-		font-size: 1.3rem;
-		font-weight: 700;
+	.add button {
+		background: var(--bg-card);
+		color: var(--text);
+		border: 1px solid var(--border);
+		border-radius: 0.6rem;
+		width: 2.6rem;
+		font-size: 1.2rem;
 		cursor: pointer;
 	}
 
-	.add-row button:disabled {
+	.add button:disabled {
 		opacity: 0.3;
 	}
 
-	.settings-block {
-		font-size: 0.85rem;
+	.bedtime-edit {
+		font-size: 0.8rem;
 		color: var(--text-muted);
 	}
 
-	.settings-block summary {
+	.bedtime-edit summary {
 		cursor: pointer;
-		padding: 0.5rem 0;
 	}
 
-	.settings-block input[type='time'] {
+	.bedtime-edit input {
 		margin-top: 0.5rem;
 		background: var(--field);
 		color: var(--text);
 		border: 1px solid var(--border);
-		border-radius: 0.85rem;
-		padding: 0.7rem 0.85rem;
+		border-radius: 0.6rem;
+		padding: 0.65rem 0.85rem;
 		font: inherit;
-		width: 100%;
 	}
 </style>
