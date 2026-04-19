@@ -1,16 +1,24 @@
 <script lang="ts">
 	import '../app.css';
 	import { page } from '$app/stores';
+	import { browser } from '$app/environment';
+
+	if (browser && 'serviceWorker' in navigator) {
+		navigator.serviceWorker.register('/sw.js');
+	}
 
 	interface NavItem {
 		label: string;
 		href: string;
 		icon: string;
+		disabled: boolean;
 	}
 
 	const navItems: NavItem[] = [
-		{ label: 'Fokus', href: '/', icon: '◉' },
-		{ label: 'Asetukset', href: '/asetukset', icon: '⌘' }
+		{ label: 'Etusivu', href: '/', icon: '🏠', disabled: false },
+		{ label: 'Iltavahti', href: '/iltavahti', icon: '🌙', disabled: false },
+		{ label: 'Aamurituaali', href: '/aamurituaali', icon: '☀️', disabled: true },
+		{ label: 'Asetukset', href: '/asetukset', icon: '⚙️', disabled: false }
 	];
 
 	let { children } = $props();
@@ -23,14 +31,22 @@
 
 	<nav class="tab-bar">
 		{#each navItems as item}
-			<a
-				href={item.href}
-				class="tab-item"
-				class:active={$page.url.pathname === item.href}
-			>
-				<span class="tab-icon">{item.icon}</span>
-				<span class="tab-label">{item.label}</span>
-			</a>
+			{#if item.disabled}
+				<div class="tab-item disabled">
+					<span class="tab-icon">{item.icon}</span>
+					<span class="tab-label">{item.label}</span>
+					<span class="tab-badge">Tulossa</span>
+				</div>
+			{:else}
+				<a
+					href={item.href}
+					class="tab-item"
+					class:active={$page.url.pathname === item.href}
+				>
+					<span class="tab-icon">{item.icon}</span>
+					<span class="tab-label">{item.label}</span>
+				</a>
+			{/if}
 		{/each}
 	</nav>
 </div>
@@ -65,7 +81,7 @@
 	}
 
 	.tab-bar > :global(*) {
-		max-width: calc(var(--max-width) / 2);
+		max-width: calc(var(--max-width) / 4);
 	}
 
 	.tab-item {
@@ -87,14 +103,24 @@
 		color: var(--accent);
 	}
 
+	.tab-item.disabled {
+		opacity: 0.4;
+		cursor: default;
+	}
+
 	.tab-icon {
-		font-size: 1.1rem;
+		font-size: 1.25rem;
 		line-height: 1;
-		font-weight: 700;
 	}
 
 	.tab-label {
-		font-weight: 600;
-		letter-spacing: 0.02em;
+		font-weight: 500;
+	}
+
+	.tab-badge {
+		font-size: 0.5rem;
+		color: var(--text-muted);
+		position: absolute;
+		bottom: 0.15rem;
 	}
 </style>
