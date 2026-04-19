@@ -1,20 +1,27 @@
 <svelte:options runes={false} />
 
 <script lang="ts">
-	import { iltavahti } from '$lib/iltavahti';
-	import { onDestroy } from 'svelte';
+	import { iltavahti, requestWakeLock, releaseWakeLock, initAudio, playAlarm } from '$lib/iltavahti';
+	import { onDestroy, onMount } from 'svelte';
 
 	let now = new Date();
 	const timer = setInterval(() => (now = new Date()), 1000);
-	onDestroy(() => clearInterval(timer));
+	onDestroy(() => {
+		clearInterval(timer);
+		releaseWakeLock();
+	});
 
-	let newTask = '';
+	let started = false;
+	let alarmPlayed = false;
 
 	$: state = $iltavahti;
-	$: doneCount = state.tasks.filter((t) => t.done).length;
-	$: totalCount = state.tasks.length;
-	$: allDone = totalCount > 0 && doneCount === totalCount;
-	$: progress = totalCount > 0 ? (doneCount / totalCount) * 100 : 0;
+	$: remaining = state.tasks.filter((t) => !t.done);
+	$: currentTask = remaining[0] ?? null;
+	$: doneCount = state.tasks.length - remaining.length;
+	$: allDone = state.tasks.length > 0 && remaining.length === 0;
+	$: stepLabel = allDone
+		? ''
+		: `${doneCount + 1} / ${state.tasks.length}`;
 
 	$: bedtimeParts = state.bedtime.split(':').map(Number);
 	$: bedtimeToday = (() => {
@@ -22,31 +29,49 @@
 		d.setHours(bedtimeParts[0], bedtimeParts[1], 0, 0);
 		return d;
 	})();
-	$: minutesLeft = Math.floor((bedtimeToday.getTime() - now.getTime()) / 60000);
+	$: minutesLeft = Math.round((bedtimeToday.getTime() - now.getTime()) / 60000);
 
-	$: timeLabel = (() => {
-		if (minutesLeft <= 0) return 'Aika meni';
+	$: countdownText = (() => {
+		if (minutesLeft <= 0) {
+			const over = Math.abs(minutesLeft);
+			if (over < 60) return `+${over} min yli`;
+			return `+${Math.floor(over / 60)} h ${over % 60} min yli`;
+		}
 		if (minutesLeft < 60) return `${minutesLeft} min`;
 		const h = Math.floor(minutesLeft / 60);
 		const m = minutesLeft % 60;
+		if (m === 0) return `${h} h`;
 		return `${h} h ${m} min`;
 	})();
 
 	$: urgency = (() => {
 		if (minutesLeft <= 0) return 'past';
-		if (minutesLeft <= 15) return 'urgent';
-		if (minutesLeft <= 45) return 'soon';
+		if (minutesLeft <= 15) return 'red';
+		if (minutesLeft <= 45) return 'yellow';
 		return 'ok';
 	})();
 
-	function clock(date: Date) {
-		return date.toLocaleTimeString('fi-FI', { hour: '2-digit', minute: '2-digit' });
+	// Soita hälytys kun aika menee yli
+	$: if (started && minutesLeft <= 0 && !alarmPlayed && !allDone) {
+		playAlarm();
+		alarmPlayed = true;
 	}
 
-	function addTask() {
-		if (!newTask.trim()) return;
-		iltavahti.addTask(newTask);
-		newTask = '';
+	function start() {
+		started = true;
+		alarmPlayed = false;
+		initAudio();
+		requestWakeLock();
+	}
+
+	function complete() {
+		if (currentTask) {
+			iltavahti.markDone(currentTask.id);
+		}
+	}
+
+	function clock(date: Date) {
+		return date.toLocaleTimeString('fi-FI', { hour: '2-digit', minute: '2-digit' });
 	}
 </script>
 
@@ -54,206 +79,207 @@
 	<title>Iltavahti</title>
 </svelte:head>
 
-<div class="page">
-	<header class="top">
-		<div>
-			<h1>Iltavahti</h1>
-			<p class="meta">Nukkumaan {state.bedtime} &middot; {timeLabel}</p>
-		</div>
-		<div class="clock" class:urgent={urgency === 'urgent' || urgency === 'past'}>
-			{clock(now)}
-		</div>
-	</header>
-
-	<div class="bar">
-		<div class="bar-fill" class:urgent={urgency === 'urgent' || urgency === 'past'} style="width: {progress}%"></div>
+{#if !started}
+	<div class="start-screen">
+		<div class="start-clock">{clock(now)}</div>
+		<p class="start-target">Nukkumaan {state.bedtime}</p>
+		<p class="start-left" class:red={urgency === 'red' || urgency === 'past'} class:yellow={urgency === 'yellow'}>
+			{countdownText}
+		</p>
+		<button class="start-btn" onclick={start}>
+			Aloita iltatoimet
+		</button>
+		<details class="edit-bedtime">
+			<summary>Vaihda aika</summary>
+			<input
+				type="time"
+				value={state.bedtime}
+				onchange={(e) => iltavahti.setBedtime((e.currentTarget as HTMLInputElement).value)}
+			/>
+		</details>
 	</div>
+{:else if allDone}
+	<div class="done-screen">
+		<div class="done-clock">{clock(now)}</div>
+		<p class="done-text">Valmis. Laita silmät kiinni.</p>
+	</div>
+{:else}
+	<div class="task-screen">
+		<div class="countdown" class:red={urgency === 'red' || urgency === 'past'} class:yellow={urgency === 'yellow'}>
+			{countdownText}
+		</div>
 
-	{#if allDone}
-		<p class="done">Kaikki tehty. Hyvää yötä.</p>
-	{/if}
+		<div class="step">{stepLabel}</div>
 
-	<section class="tasks">
-		{#each state.tasks as task (task.id)}
-			<button
-				type="button"
-				class="task"
-				class:checked={task.done}
-				onclick={() => iltavahti.toggleTask(task.id)}
-			>
-				<span class="check">{task.done ? '✓' : ''}</span>
-				<span class:strike={task.done}>{task.label}</span>
-			</button>
-		{/each}
-	</section>
+		<div class="current-task">{currentTask?.label}</div>
 
-	<form class="add" onsubmit={(e) => { e.preventDefault(); addTask(); }}>
-		<input bind:value={newTask} placeholder="Lisää tehtävä..." />
-		<button type="submit" disabled={!newTask.trim()}>+</button>
-	</form>
+		<button class="done-btn" onclick={complete}>
+			Tehty
+		</button>
 
-	<details class="bedtime-edit">
-		<summary>Vaihda nukkumaanmenoaika</summary>
-		<input
-			type="time"
-			value={state.bedtime}
-			onchange={(e) => iltavahti.setBedtime((e.currentTarget as HTMLInputElement).value)}
-		/>
-	</details>
-</div>
+		<div class="rest">
+			{#each remaining.slice(1) as task (task.id)}
+				<span>{task.label}</span>
+			{/each}
+		</div>
+	</div>
+{/if}
 
 <style>
-	.page {
+	/* Aloitusnäkymä */
+	.start-screen {
 		display: flex;
 		flex-direction: column;
-		gap: 1rem;
-	}
-
-	.top {
-		display: flex;
-		justify-content: space-between;
-		align-items: flex-start;
-	}
-
-	h1 {
-		font-size: 1.3rem;
-		font-weight: 600;
-	}
-
-	.meta {
-		font-size: 0.8rem;
-		color: var(--text-muted);
-		margin-top: 0.1rem;
-	}
-
-	.clock {
-		font-size: 1.4rem;
-		font-weight: 600;
-		font-variant-numeric: tabular-nums;
-		color: var(--text-muted);
-	}
-
-	.clock.urgent {
-		color: #f87171;
-	}
-
-	.bar {
-		height: 4px;
-		background: var(--border);
-		border-radius: 2px;
-		overflow: hidden;
-	}
-
-	.bar-fill {
-		height: 100%;
-		background: var(--accent);
-		border-radius: 2px;
-		transition: width 0.3s;
-	}
-
-	.bar-fill.urgent {
-		background: #f87171;
-	}
-
-	.done {
-		color: #4ade80;
-		font-size: 0.9rem;
-	}
-
-	.tasks {
-		display: flex;
-		flex-direction: column;
-		gap: 0.35rem;
-	}
-
-	.task {
-		display: flex;
-		align-items: center;
-		gap: 0.75rem;
-		width: 100%;
-		padding: 0.8rem 1rem;
-		background: var(--bg-card);
-		border: 1px solid var(--border);
-		border-radius: 0.6rem;
-		color: var(--text);
-		font: inherit;
-		font-size: 0.9rem;
-		text-align: left;
-		cursor: pointer;
-	}
-
-	.task.checked {
-		opacity: 0.4;
-	}
-
-	.check {
-		width: 1.3rem;
-		height: 1.3rem;
-		border: 2px solid var(--border);
-		border-radius: 0.3rem;
-		display: flex;
 		align-items: center;
 		justify-content: center;
-		font-size: 0.75rem;
-		flex-shrink: 0;
-	}
-
-	.task.checked .check {
-		background: var(--accent);
-		border-color: var(--accent);
-		color: white;
-	}
-
-	.strike {
-		text-decoration: line-through;
-	}
-
-	.add {
-		display: flex;
+		min-height: 70vh;
 		gap: 0.5rem;
+		text-align: center;
 	}
 
-	.add input {
-		flex: 1;
-		background: var(--field);
-		color: var(--text);
-		border: 1px solid var(--border);
+	.start-clock {
+		font-size: 4rem;
+		font-weight: 700;
+		font-variant-numeric: tabular-nums;
+		line-height: 1;
+	}
+
+	.start-target {
+		font-size: 1rem;
+		color: var(--text-muted);
+	}
+
+	.start-left {
+		font-size: 1.5rem;
+		font-weight: 600;
+		margin-bottom: 2rem;
+	}
+
+	.start-btn {
+		background: var(--accent);
+		color: white;
+		border: none;
 		border-radius: 0.6rem;
-		padding: 0.65rem 0.85rem;
+		padding: 1rem 3rem;
 		font: inherit;
-		font-size: 0.9rem;
-	}
-
-	.add button {
-		background: var(--bg-card);
-		color: var(--text);
-		border: 1px solid var(--border);
-		border-radius: 0.6rem;
-		width: 2.6rem;
-		font-size: 1.2rem;
+		font-size: 1.1rem;
+		font-weight: 600;
 		cursor: pointer;
+		-webkit-tap-highlight-color: transparent;
 	}
 
-	.add button:disabled {
-		opacity: 0.3;
+	.start-btn:active {
+		opacity: 0.8;
 	}
 
-	.bedtime-edit {
+	.edit-bedtime {
+		margin-top: 1.5rem;
 		font-size: 0.8rem;
 		color: var(--text-muted);
 	}
 
-	.bedtime-edit summary {
+	.edit-bedtime summary {
 		cursor: pointer;
 	}
 
-	.bedtime-edit input {
+	.edit-bedtime input {
 		margin-top: 0.5rem;
 		background: var(--field);
 		color: var(--text);
 		border: 1px solid var(--border);
-		border-radius: 0.6rem;
-		padding: 0.65rem 0.85rem;
+		border-radius: 0.5rem;
+		padding: 0.5rem 0.75rem;
 		font: inherit;
+	}
+
+	/* Tehtävänäkymä — yksi kerrallaan */
+	.task-screen {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		min-height: 70vh;
+		text-align: center;
+		gap: 0.75rem;
+	}
+
+	.countdown {
+		font-size: 3rem;
+		font-weight: 700;
+		font-variant-numeric: tabular-nums;
+		line-height: 1;
+		transition: color 0.5s;
+	}
+
+	.step {
+		font-size: 0.8rem;
+		color: var(--text-muted);
+		letter-spacing: 0.05em;
+	}
+
+	.current-task {
+		font-size: 1.6rem;
+		font-weight: 600;
+		margin: 1.5rem 0;
+		max-width: 20ch;
+	}
+
+	.done-btn {
+		background: var(--accent);
+		color: white;
+		border: none;
+		border-radius: 0.6rem;
+		padding: 1.2rem 4rem;
+		font: inherit;
+		font-size: 1.2rem;
+		font-weight: 600;
+		cursor: pointer;
+		margin-bottom: 2rem;
+		-webkit-tap-highlight-color: transparent;
+	}
+
+	.done-btn:active {
+		opacity: 0.8;
+	}
+
+	.rest {
+		display: flex;
+		flex-direction: column;
+		gap: 0.3rem;
+		font-size: 0.8rem;
+		color: var(--text-muted);
+	}
+
+	/* Valmis-näkymä — yöpöytäkello */
+	.done-screen {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		min-height: 80vh;
+		text-align: center;
+		gap: 1rem;
+	}
+
+	.done-clock {
+		font-size: 5rem;
+		font-weight: 700;
+		font-variant-numeric: tabular-nums;
+		line-height: 1;
+		color: var(--text-muted);
+	}
+
+	.done-text {
+		font-size: 1.1rem;
+		color: var(--text-muted);
+	}
+
+	/* Värit */
+	.yellow {
+		color: #fbbf24;
+	}
+
+	.red {
+		color: #f87171;
 	}
 </style>
