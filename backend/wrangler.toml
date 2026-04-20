@@ -1,0 +1,23 @@
+name = "iltavahti-backend"
+main = "src/index.ts"
+compatibility_date = "2024-11-06"
+
+# Joka minuutti: tarkista erääntyvät muistutukset
+[triggers]
+crons = ["* * * * *"]
+
+# D1-tietokanta (luodaan wrangler d1 create -komennolla, id korvataan)
+[[d1_databases]]
+binding = "DB"
+database_name = "iltavahti-db"
+database_id = "REPLACE_AFTER_D1_CREATE"
+
+# CORS origin (GitHub Pages -domain). Aseta wrangler secret put CORS_ORIGIN
+# Esim: https://kapesiv.github.io
+[vars]
+CORS_ORIGIN = "https://kapesiv.github.io"
+
+# Salaisia (aseta wrangler secret put):
+# VAPID_PUBLIC_KEY     - base64url EC public key
+# VAPID_PRIVATE_KEY    - base64url EC private key (d)
+# VAPID_SUBJECT        - mailto: tai https://... (omistaja-yhteystieto)

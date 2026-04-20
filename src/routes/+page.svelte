@@ -26,9 +26,21 @@
 	import InteractionModal from '$lib/modules/iltavahti/InteractionModal.svelte';
 	import IntensityOverlay from '$lib/modules/iltavahti/IntensityOverlay.svelte';
 	import { downloadIcs } from '$lib/modules/iltavahti/ical';
+	import {
+		subscribeToPush,
+		unsubscribeFromPush,
+		getSubscriptionState,
+		isPushSupported,
+		isIos,
+		isStandalonePwa
+	} from '$lib/modules/iltavahti/push-client';
 	import { base } from '$app/paths';
 	import { browser } from '$app/environment';
 	import type { IntensityLevel } from '$lib/core/events';
+
+	const PUSH_BACKEND_URL = import.meta.env.VITE_PUSH_BACKEND_URL as string | undefined;
+	const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY as string | undefined;
+	const pushConfigured = !!(PUSH_BACKEND_URL && VAPID_PUBLIC_KEY);
 
 	// --- State ---
 	let now = new Date();
@@ -105,6 +117,36 @@
 		if (!browser || typeof Notification === 'undefined') return;
 		const result = await Notification.requestPermission();
 		notifPermission = result;
+	}
+
+	// --- Push subscription ---
+	let pushSubscribed = false;
+	let pushBusy = false;
+	let pushError = '';
+
+	onMount(async () => {
+		if (!browser) return;
+		const state = await getSubscriptionState();
+		pushSubscribed = state.subscribed;
+	});
+
+	async function togglePushSubscription() {
+		if (!pushConfigured || !PUSH_BACKEND_URL || !VAPID_PUBLIC_KEY) return;
+		pushBusy = true;
+		pushError = '';
+		try {
+			if (pushSubscribed) {
+				await unsubscribeFromPush(PUSH_BACKEND_URL);
+				pushSubscribed = false;
+			} else {
+				await subscribeToPush(PUSH_BACKEND_URL, VAPID_PUBLIC_KEY, $settings);
+				pushSubscribed = true;
+			}
+		} catch (err) {
+			pushError = err instanceof Error ? err.message : String(err);
+		} finally {
+			pushBusy = false;
+		}
 	}
 
 	$: state = $iltavahti;
@@ -327,18 +369,38 @@
 		{#if $settings.onboardingDone}
 			<div class="reach-block">
 				<p class="reach-title">Tavoittaminen</p>
-				<p class="reach-hint">Iltavahti ei voi soittaa sinulle suljettuna. Lataa kalenterimuistutukset, niin puhelin huutaa vaikka olet TikTokissa.</p>
+				<p class="reach-hint">Iltavahti ei voi soittaa sinulle suljettuna. Lataa kalenterimuistutukset tai tilaa push — puhelin huutaa vaikka olet TikTokissa.</p>
 				<button class="reach-btn" onclick={onCalendarDownload}>
 					{calendarSaved ? '✓ Ladattu — avaa kalenterissa' : 'Lataa kalenterimuistutukset'}
 				</button>
-				{#if notifPermission === 'default'}
+
+				{#if pushConfigured && isPushSupported()}
+					{#if isIos() && !isStandalonePwa()}
+						<p class="reach-warn">iPhonella push toimii vain kun Iltavahti on lisätty kotiruutuun (Jaa → Lisää kotiruutuun).</p>
+					{:else}
+						<button
+							class="reach-btn secondary"
+							onclick={togglePushSubscription}
+							disabled={pushBusy}
+						>
+							{pushBusy
+								? 'Hetki...'
+								: pushSubscribed
+									? '✓ Push päällä — peru'
+									: 'Tilaa push-muistutukset'}
+						</button>
+						{#if pushError}
+							<p class="reach-warn">{pushError}</p>
+						{/if}
+					{/if}
+				{/if}
+
+				{#if notifPermission === 'default' && !pushConfigured}
 					<button class="reach-btn secondary" onclick={requestNotifPermission}>
 						Salli notifikaatiot tässä selaimessa
 					</button>
 				{:else if notifPermission === 'denied'}
 					<p class="reach-warn">Notifikaatiot estetty. Salli selaimen asetuksista.</p>
-				{:else if notifPermission === 'granted'}
-					<p class="reach-ok">✓ Notifikaatiot sallittu</p>
 				{/if}
 			</div>
 		{/if}
@@ -588,10 +650,6 @@
 	.reach-warn {
 		font-size: 0.8rem;
 		color: var(--danger);
-	}
-	.reach-ok {
-		font-size: 0.8rem;
-		color: var(--intensity-calm);
 	}
 
 	/* ── Rewards ── */
