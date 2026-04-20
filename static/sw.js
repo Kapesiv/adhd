@@ -114,8 +114,8 @@ self.addEventListener('push', (event) => {
 				tag: 'iltavahti',
 				renotify: true,
 				requireInteraction: true,
-				icon: config?.appUrl ? `${config.appUrl}/icons/icon-192.png` : undefined,
-				badge: config?.appUrl ? `${config.appUrl}/icons/icon-192.png` : undefined,
+				icon: config?.appUrl ? `${config.appUrl}/icons/icon-192x192.png` : undefined,
+				badge: config?.appUrl ? `${config.appUrl}/icons/icon-192x192.png` : undefined,
 				data: { url }
 			});
 		})()
