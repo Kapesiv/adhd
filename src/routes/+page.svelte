@@ -56,12 +56,39 @@
 
 	let level: IntensityLevel = 'calm';
 
+	let autoStartChecked = false;
+
 	onMount(() => {
 		const s = $iltavahti;
 		if (isTodayDone(s.completedDays ?? [])) {
 			mode = 'done';
 		}
 	});
+
+	// Auto-start doing-tilaan settingsien latauduttua:
+	// a) notifikaatiosta tuli ?autostart=1, TAI
+	// b) nukkumaanmenoaika on mennyt ja iltatoimet tekemättä
+	$: if (
+		!autoStartChecked &&
+		browser &&
+		mode === 'idle' &&
+		$settings.onboardingDone &&
+		state.tasks.length > 0 &&
+		!isTodayDone(state.completedDays ?? [])
+	) {
+		autoStartChecked = true;
+		const url = new URL(window.location.href);
+		const autoRequested = url.searchParams.get('autostart') === '1';
+		const past = hoursRemaining <= 0;
+		if (autoRequested || past) {
+			mode = 'doing';
+			requestWakeLock();
+			if (autoRequested) {
+				url.searchParams.delete('autostart');
+				history.replaceState({}, '', url.toString());
+			}
+		}
+	}
 
 	onDestroy(() => {
 		clearInterval(timer);
@@ -318,10 +345,12 @@
 <!-- IDLE: streak + start -->
 {:else}
 	<div class="page">
-		<!-- Settings toggle -->
-		<button class="settings-btn" onclick={() => showSettings = !showSettings}>
-			{showSettings ? 'Sulje' : 'Asetukset'}
-		</button>
+		<div class="idle-top">
+			<p class="idle-clock">{clock(now)}</p>
+			<button class="settings-btn" onclick={() => showSettings = !showSettings}>
+				{showSettings ? 'Sulje' : 'Asetukset'}
+			</button>
+		</div>
 
 		{#if showSettings}
 			<div class="settings-panel">
@@ -367,6 +396,19 @@
 		</button>
 
 		{#if $settings.onboardingDone}
+			{#if isIos() && !isStandalonePwa()}
+				<div class="install-block">
+					<p class="install-title">Asenna Iltavahti kotiruutuun</p>
+					<p class="install-hint">iPhonella push-muistutukset toimivat <b>vain</b> kun sovellus on avattu kotiruudulta. Tee näin:</p>
+					<ol class="install-steps">
+						<li><span class="step-num">1</span> Paina <span class="pill">Jaa <span class="share-ico">⎙</span></span> Safarin alapalkista</li>
+						<li><span class="step-num">2</span> Valitse <span class="pill">Lisää Koti-valikkoon</span></li>
+						<li><span class="step-num">3</span> Paina <span class="pill">Lisää</span> oikeassa yläkulmassa</li>
+						<li><span class="step-num">4</span> Avaa Iltavahti kotiruudun ikonista</li>
+					</ol>
+				</div>
+			{/if}
+
 			<div class="reach-block">
 				<p class="reach-title">Tavoittaminen</p>
 				<p class="reach-hint">Iltavahti ei voi soittaa sinulle suljettuna. Lataa kalenterimuistutukset tai tilaa push — puhelin huutaa vaikka olet TikTokissa.</p>
@@ -376,7 +418,7 @@
 
 				{#if pushConfigured && isPushSupported()}
 					{#if isIos() && !isStandalonePwa()}
-						<p class="reach-warn">iPhonella push toimii vain kun Iltavahti on lisätty kotiruutuun (Jaa → Lisää kotiruutuun).</p>
+						<p class="reach-warn">Asenna ensin kotiruutuun yllä olevien ohjeiden mukaan.</p>
 					{:else}
 						<button
 							class="reach-btn secondary"
@@ -437,9 +479,22 @@
 		min-height: 100dvh;
 	}
 
+	/* ── Idle top ── */
+	.idle-top {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+	}
+	.idle-clock {
+		font-size: 1.8rem;
+		font-weight: 300;
+		font-variant-numeric: tabular-nums;
+		color: var(--text);
+		letter-spacing: 0.05em;
+	}
+
 	/* ── Settings ── */
 	.settings-btn {
-		align-self: flex-end;
 		background: none;
 		border: none;
 		color: var(--text-muted);
@@ -605,6 +660,69 @@
 
 	.start-btn:active {
 		opacity: 0.85;
+	}
+
+	/* ── Install guide (iOS home screen) ── */
+	.install-block {
+		padding: 1.1rem 1rem;
+		border-radius: 0.75rem;
+		background: linear-gradient(135deg, rgba(249, 115, 22, 0.12), rgba(249, 115, 22, 0.04));
+		border: 1px solid var(--accent);
+	}
+	.install-title {
+		font-size: 1rem;
+		font-weight: 700;
+		color: var(--text);
+		margin-bottom: 0.4rem;
+	}
+	.install-hint {
+		font-size: 0.85rem;
+		color: var(--text-muted);
+		margin-bottom: 0.85rem;
+		line-height: 1.45;
+	}
+	.install-steps {
+		list-style: none;
+		padding: 0;
+		margin: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 0.55rem;
+	}
+	.install-steps li {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		font-size: 0.9rem;
+		line-height: 1.35;
+	}
+	.step-num {
+		flex-shrink: 0;
+		width: 22px;
+		height: 22px;
+		border-radius: 50%;
+		background: var(--accent);
+		color: #fff;
+		font-size: 0.8rem;
+		font-weight: 700;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+	}
+	.pill {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.25rem;
+		padding: 0.15rem 0.5rem;
+		border-radius: 0.4rem;
+		background: var(--bg);
+		border: 1px solid var(--border);
+		font-size: 0.85rem;
+		color: var(--text);
+	}
+	.share-ico {
+		font-size: 0.95rem;
+		transform: translateY(-1px);
 	}
 
 	/* ── Reach (calendar / notifications) ── */
