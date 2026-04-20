@@ -68,10 +68,10 @@
 <div class="onboarding" class:fade-in={fadeIn}>
 	{#if step === 1}
 		<div class="step step-1">
-			<h1 class="gradient-text">Ilta venyy.</h1>
-			<h1 class="gradient-text">Aamu tulee silti.</h1>
-			<p class="subtitle">Iltavahti auttaa sinua menemään nukkumaan ajoissa.</p>
-			<p class="detail">Ei to-do-listoja. Ei syyllistämistä. Vain rehellinen kello ja pientä painostusta.</p>
+			<p class="brand-pill">Lääke ilman lääkettä</p>
+			<h1 class="gradient-text">Concentra</h1>
+			<p class="subtitle">Ulkoinen otsalohko taskussa. Auttaa sinua tekemään sen minkä tiedät — mutta jonka aivosi unohtavat.</p>
+			<p class="detail">Ei syyllistämistä. Ei streakkejä. Vain lempeä rakenne ja rehellinen kello.</p>
 			<button class="cta" on:click={nextStep}>Aloitetaan</button>
 		</div>
 
@@ -157,8 +157,8 @@
 				<span class="big-label">tuntia unta jos menet nyt</span>
 			</div>
 			<p class="subtitle">Tämä numero päivittyy reaaliajassa.</p>
-			<p class="detail">Kun aika loppuu, Iltavahti alkaa painostamaan.</p>
-			<button class="cta" on:click={finish}>Käynnistä Iltavahti</button>
+			<p class="detail">Concentra muistuttaa lempeästi kun on aika rauhoittua.</p>
+			<button class="cta" on:click={finish}>Ota käyttöön</button>
 		</div>
 	{/if}
 </div>
@@ -181,14 +181,27 @@
 		text-align: center;
 	}
 
+	.brand-pill {
+		display: inline-block;
+		padding: 0.35rem 1rem;
+		border-radius: 2rem;
+		background: var(--accent-dim);
+		color: var(--accent);
+		font-size: 0.78rem;
+		font-weight: 600;
+		letter-spacing: 0.04em;
+		margin-bottom: 1.25rem;
+	}
+
 	.gradient-text {
-		font-size: 2rem;
-		font-weight: 700;
-		background: linear-gradient(45deg, #fff, #7eb2ff);
+		font-size: 2.5rem;
+		font-weight: 200;
+		background: linear-gradient(135deg, #fff 20%, #7eb2ff 80%);
 		-webkit-background-clip: text;
 		-webkit-text-fill-color: transparent;
 		background-clip: text;
-		line-height: 1.3;
+		line-height: 1.2;
+		letter-spacing: -0.02em;
 	}
 
 	h2 {

@@ -10,26 +10,26 @@ interface ReminderTemplate {
 const reminders: ReminderTemplate[] = [
 	{
 		uid: 'iltavahti-2h',
-		summary: 'Iltavahti: 2h nukkumaanmenoon',
-		description: 'Aleta rauhoittumaan. Avaa Iltavahti.',
+		summary: 'Concentra: 2h nukkumaanmenoon',
+		description: 'Aleta rauhoittumaan. Avaa Concentra.',
 		offsetMinutesBeforeBedtime: 120
 	},
 	{
 		uid: 'iltavahti-1h',
-		summary: 'Iltavahti: 1h jäljellä',
-		description: 'Aloita iltatoimet. Avaa Iltavahti.',
+		summary: 'Concentra: 1h jäljellä',
+		description: 'Aloita iltatoimet. Avaa Concentra.',
 		offsetMinutesBeforeBedtime: 60
 	},
 	{
 		uid: 'iltavahti-30m',
-		summary: 'Iltavahti: 30 min',
-		description: 'Lopeta puuhat. Avaa Iltavahti.',
+		summary: 'Concentra: 30 min',
+		description: 'Lopeta puuhat. Avaa Concentra.',
 		offsetMinutesBeforeBedtime: 30
 	},
 	{
 		uid: 'iltavahti-now',
 		summary: 'NUKKUMAAN NYT',
-		description: 'Nukkumaanmenoaika. Avaa Iltavahti.',
+		description: 'Nukkumaanmenoaika. Avaa Concentra.',
 		offsetMinutesBeforeBedtime: 0
 	}
 ];
@@ -74,7 +74,7 @@ export function generateIcs(settings: UserSettings, appUrl: string): string {
 	const lines: string[] = [
 		'BEGIN:VCALENDAR',
 		'VERSION:2.0',
-		'PRODID:-//Iltavahti//Iltavahti Reminders//FI',
+		'PRODID:-//Concentra//Concentra Reminders//FI',
 		'CALSCALE:GREGORIAN',
 		'METHOD:PUBLISH'
 	];
@@ -119,7 +119,7 @@ export function downloadIcs(settings: UserSettings, appUrl: string): void {
 	const url = URL.createObjectURL(blob);
 	const link = document.createElement('a');
 	link.href = url;
-	link.download = 'iltavahti.ics';
+	link.download = 'concentra.ics';
 	document.body.appendChild(link);
 	link.click();
 	document.body.removeChild(link);

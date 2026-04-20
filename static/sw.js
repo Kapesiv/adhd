@@ -85,7 +85,7 @@ self.addEventListener('message', (event) => {
 self.addEventListener('push', (event) => {
 	event.waitUntil(
 		(async () => {
-			let title = 'Iltavahti';
+			let title = 'Concentra';
 			let body = 'Aika rauhoittua.';
 			let url = '/';
 

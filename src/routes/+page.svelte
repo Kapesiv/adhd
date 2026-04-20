@@ -201,7 +201,7 @@
 </script>
 
 <svelte:head>
-	<title>Iltavahti</title>
+	<title>Concentra</title>
 </svelte:head>
 
 <!-- DONE: goodnight + rewards -->
@@ -319,20 +319,20 @@
 		{#if $settings.onboardingDone}
 			{#if isIos() && !isStandalonePwa()}
 				<div class="install-block">
-					<p class="install-title">Asenna Iltavahti kotiruutuun</p>
+					<p class="install-title">Asenna Concentra kotiruutuun</p>
 					<p class="install-hint">iPhonella push-muistutukset toimivat <b>vain</b> kun sovellus on avattu kotiruudulta. Tee näin:</p>
 					<ol class="install-steps">
 						<li><span class="step-num">1</span> Paina <span class="pill">Jaa <span class="share-ico">⎙</span></span> Safarin alapalkista</li>
 						<li><span class="step-num">2</span> Valitse <span class="pill">Lisää Koti-valikkoon</span></li>
 						<li><span class="step-num">3</span> Paina <span class="pill">Lisää</span> oikeassa yläkulmassa</li>
-						<li><span class="step-num">4</span> Avaa Iltavahti kotiruudun ikonista</li>
+						<li><span class="step-num">4</span> Avaa Concentra kotiruudun ikonista</li>
 					</ol>
 				</div>
 			{/if}
 
 			<div class="reach-block">
 				<p class="reach-title">Tavoittaminen</p>
-				<p class="reach-hint">Iltavahti ei voi soittaa sinulle suljettuna. Lataa kalenterimuistutukset tai tilaa push — puhelin huutaa vaikka olet TikTokissa.</p>
+				<p class="reach-hint">Concentra ei voi soittaa sinulle suljettuna. Lataa kalenterimuistutukset tai tilaa push — puhelin huutaa vaikka olet TikTokissa.</p>
 				<button class="reach-btn" onclick={onCalendarDownload}>
 					{calendarSaved ? '✓ Ladattu — avaa kalenterissa' : 'Lataa kalenterimuistutukset'}
 				</button>
@@ -404,7 +404,7 @@
 				</div>
 
 				<p class="help-text">
-					Pushit toimivat iPhonessa vain, kun Iltavahti on lisätty kotiruutuun ja avattu sieltä.
+					Pushit toimivat iPhonessa vain, kun Concentra on lisätty kotiruutuun ja avattu sieltä.
 				</p>
 
 				<ol class="help-steps">
@@ -412,7 +412,7 @@
 					<li>Paina alareunan <b>Jaa</b>-nappia.</li>
 					<li>Valitse <b>Lisää Koti-valikkoon</b>.</li>
 					<li>Paina oikeasta yläkulmasta <b>Lisää</b>.</li>
-					<li>Avaa Iltavahti kotiruudun uudesta ikonista.</li>
+					<li>Avaa Concentra kotiruudun uudesta ikonista.</li>
 					<li>Paina tässä sovelluksessa <b>Tilaa push-muistutukset</b> ja hyväksy ilmoitukset.</li>
 				</ol>
 
