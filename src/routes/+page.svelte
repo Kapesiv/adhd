@@ -17,14 +17,6 @@
 		getIntensityLevel,
 		formatTime
 	} from '$lib/modules/iltavahti/time-engine';
-	import {
-		handleIntensityChange,
-		stopIntensityHandler,
-		currentInteraction,
-		clearCurrentInteraction
-	} from '$lib/modules/iltavahti/intensity-handler';
-	import InteractionModal from '$lib/modules/iltavahti/InteractionModal.svelte';
-	import IntensityOverlay from '$lib/modules/iltavahti/IntensityOverlay.svelte';
 	import { downloadIcs } from '$lib/modules/iltavahti/ical';
 	import { saveSettings } from '$lib/core/storage';
 	import {
@@ -96,8 +88,6 @@
 		releaseWakeLock();
 		stopAlarm();
 		stopMotionDetection();
-		stopIntensityHandler();
-		clearCurrentInteraction();
 	});
 
 	// Intensiteetti: laske jokaisella tikityksella
@@ -112,18 +102,6 @@
 	})();
 	$: level = getIntensityLevel(hoursRemaining);
 
-	// Aktivoi handler vain idle-tilassa (doing-tilassa käyttäjä tekee jo tehtäviä)
-	$: if ($settings.onboardingDone && mode !== 'doing') {
-		handleIntensityChange(level, hoursRemaining, $settings.intensityPreference);
-	}
-	$: if (mode === 'doing') {
-		stopIntensityHandler();
-		clearCurrentInteraction();
-	}
-
-	function onInteractionDone() {
-		clearCurrentInteraction();
-	}
 
 	let calendarSaved = false;
 	function onCalendarDownload() {
@@ -500,13 +478,6 @@
 	</div>
 {/if}
 
-<!-- Intensiteetti-overlay (urgent/overdue) -->
-<IntensityOverlay {level} visible={$settings.onboardingDone && mode !== 'doing'} />
-
-<!-- Pakotettu interaktio (ei doing-tilassa) -->
-{#if $currentInteraction && mode !== 'doing'}
-	<InteractionModal interaction={$currentInteraction} on:done={onInteractionDone} />
-{/if}
 
 <style>
 	/* ── Page (idle & done views) ── */
