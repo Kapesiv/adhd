@@ -43,6 +43,7 @@
 	let phonePickedUp = false;
 	let pickupTimeout: ReturnType<typeof setTimeout> | null = null;
 	let showSettings = false;
+	let showHelp = false;
 
 	// "doing" = tapping through tasks, "idle" = streak/start view
 	let mode: 'idle' | 'doing' | 'done' = 'idle';
@@ -475,6 +476,59 @@
 				{/each}
 			</div>
 		</div>
+	</div>
+{/if}
+
+{#if mode !== 'doing'}
+	<div class="help-dock">
+		<button
+			class="help-fab"
+			type="button"
+			aria-expanded={showHelp}
+			aria-controls="ios-help-panel"
+			onclick={() => (showHelp = !showHelp)}
+		>
+			<span class="help-fab-icon">?</span>
+			<span>{showHelp ? 'Sulje apu' : 'Apua iPhonessa'}</span>
+		</button>
+
+		{#if showHelp}
+			<section class="help-panel" id="ios-help-panel">
+				<div class="help-head">
+					<div>
+						<p class="help-kicker">Nopea ohje</p>
+						<h2>Avaa tämä iPhonessa appina</h2>
+					</div>
+					<button class="help-close" type="button" aria-label="Sulje ohje" onclick={() => (showHelp = false)}>
+						×
+					</button>
+				</div>
+
+				<p class="help-text">
+					Pushit toimivat iPhonessa vain, kun Iltavahti on lisätty kotiruutuun ja avattu sieltä.
+				</p>
+
+				<ol class="help-steps">
+					<li>Avaa tämä sivu iPhonen <b>Safarissa</b>, ei Chromessa tai jonkin sovelluksen sisällä.</li>
+					<li>Paina alareunan <b>Jaa</b>-nappia.</li>
+					<li>Valitse <b>Lisää Koti-valikkoon</b>.</li>
+					<li>Paina oikeasta yläkulmasta <b>Lisää</b>.</li>
+					<li>Avaa Iltavahti kotiruudun uudesta ikonista.</li>
+					<li>Paina tässä sovelluksessa <b>Tilaa push-muistutukset</b> ja hyväksy ilmoitukset.</li>
+				</ol>
+
+				<div class="help-status">
+					<p><b>Safari:</b> {isIos() ? 'kyllä' : 'avaa tällä iPhonessa Safarissa'}</p>
+					<p><b>Kotiruutu-appi:</b> {isStandalonePwa() ? 'auki kotiruudulta' : 'ei vielä'}</p>
+					<p><b>Push:</b> {pushConfigured ? 'valmis kytkettäväksi' : 'backend ei ole tässä buildissä päällä'}</p>
+				</div>
+
+				<p class="help-note">
+					Jos et näe kohtaa <b>Lisää Koti-valikkoon</b>, olet todennäköisesti väärässä selaimessa.
+					Kopioi linkki Safariin ja yritä uudestaan.
+				</p>
+			</section>
+		{/if}
 	</div>
 {/if}
 
@@ -969,5 +1023,138 @@
 	@keyframes blink {
 		0%, 100% { opacity: 1; }
 		50% { opacity: 0.3; }
+	}
+
+	.help-dock {
+		position: fixed;
+		left: 1rem;
+		bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+		z-index: 120;
+		display: flex;
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 0.75rem;
+		max-width: min(22rem, calc(100vw - 2rem));
+	}
+
+	.help-fab {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.55rem;
+		padding: 0.7rem 0.95rem;
+		border-radius: 999px;
+		border: 1px solid rgb(249 115 22 / 0.35);
+		background: rgb(20 24 31 / 0.92);
+		color: var(--text);
+		backdrop-filter: blur(10px);
+		box-shadow: 0 10px 30px rgb(0 0 0 / 0.25);
+		cursor: pointer;
+		font-size: 0.88rem;
+		font-weight: 600;
+	}
+
+	.help-fab-icon {
+		width: 1.4rem;
+		height: 1.4rem;
+		border-radius: 50%;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		background: var(--accent);
+		color: white;
+		font-size: 0.9rem;
+		font-weight: 700;
+	}
+
+	.help-panel {
+		width: min(22rem, calc(100vw - 2rem));
+		padding: 1rem;
+		border-radius: 1rem;
+		background: rgb(19 24 34 / 0.96);
+		border: 1px solid rgb(249 115 22 / 0.2);
+		box-shadow: 0 20px 60px rgb(0 0 0 / 0.34);
+		backdrop-filter: blur(14px);
+	}
+
+	.help-head {
+		display: flex;
+		justify-content: space-between;
+		align-items: flex-start;
+		gap: 1rem;
+		margin-bottom: 0.65rem;
+	}
+
+	.help-kicker {
+		font-size: 0.72rem;
+		text-transform: uppercase;
+		letter-spacing: 0.08em;
+		color: var(--accent);
+		margin-bottom: 0.15rem;
+	}
+
+	.help-head h2 {
+		font-size: 1.1rem;
+		line-height: 1.15;
+	}
+
+	.help-close {
+		width: 2rem;
+		height: 2rem;
+		border-radius: 50%;
+		border: 1px solid var(--border);
+		background: var(--field);
+		color: var(--text);
+		font-size: 1.3rem;
+		cursor: pointer;
+	}
+
+	.help-text,
+	.help-note,
+	.help-status p {
+		font-size: 0.84rem;
+		line-height: 1.45;
+		color: var(--text-muted);
+	}
+
+	.help-steps {
+		margin: 0.85rem 0;
+		padding-left: 1.1rem;
+		display: grid;
+		gap: 0.45rem;
+		font-size: 0.88rem;
+		line-height: 1.4;
+	}
+
+	.help-status {
+		display: grid;
+		gap: 0.35rem;
+		padding: 0.8rem;
+		border-radius: 0.75rem;
+		background: rgb(255 255 255 / 0.03);
+		border: 1px solid var(--border);
+		margin-bottom: 0.75rem;
+	}
+
+	.help-status b,
+	.help-note b,
+	.help-steps b {
+		color: var(--text);
+	}
+
+	@media (max-width: 640px) {
+		.help-dock {
+			left: 0.75rem;
+			right: 0.75rem;
+			bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
+			max-width: none;
+		}
+
+		.help-panel {
+			width: min(100%, 28rem);
+		}
+
+		.help-fab {
+			max-width: 100%;
+		}
 	}
 </style>
