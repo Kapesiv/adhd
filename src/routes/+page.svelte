@@ -25,6 +25,9 @@
 	} from '$lib/modules/iltavahti/intensity-handler';
 	import InteractionModal from '$lib/modules/iltavahti/InteractionModal.svelte';
 	import IntensityOverlay from '$lib/modules/iltavahti/IntensityOverlay.svelte';
+	import { downloadIcs } from '$lib/modules/iltavahti/ical';
+	import { base } from '$app/paths';
+	import { browser } from '$app/environment';
 	import type { IntensityLevel } from '$lib/core/events';
 
 	// --- State ---
@@ -76,6 +79,32 @@
 
 	function onInteractionDone() {
 		clearCurrentInteraction();
+	}
+
+	let calendarSaved = false;
+	function onCalendarDownload() {
+		if (!browser) return;
+		const url = window.location.origin + base + '/';
+		downloadIcs($settings, url);
+		calendarSaved = true;
+		try {
+			localStorage.setItem('iltavahti-calendar-installed', '1');
+		} catch {
+			// quota
+		}
+	}
+
+	let notifPermission: NotificationPermission | 'unsupported' = 'default';
+	$: if (browser && typeof Notification !== 'undefined') {
+		notifPermission = Notification.permission;
+	} else if (browser) {
+		notifPermission = 'unsupported';
+	}
+
+	async function requestNotifPermission() {
+		if (!browser || typeof Notification === 'undefined') return;
+		const result = await Notification.requestPermission();
+		notifPermission = result;
 	}
 
 	$: state = $iltavahti;
@@ -295,6 +324,25 @@
 			Tee iltatoimet
 		</button>
 
+		{#if $settings.onboardingDone}
+			<div class="reach-block">
+				<p class="reach-title">Tavoittaminen</p>
+				<p class="reach-hint">Iltavahti ei voi soittaa sinulle suljettuna. Lataa kalenterimuistutukset, niin puhelin huutaa vaikka olet TikTokissa.</p>
+				<button class="reach-btn" onclick={onCalendarDownload}>
+					{calendarSaved ? '✓ Ladattu — avaa kalenterissa' : 'Lataa kalenterimuistutukset'}
+				</button>
+				{#if notifPermission === 'default'}
+					<button class="reach-btn secondary" onclick={requestNotifPermission}>
+						Salli notifikaatiot tässä selaimessa
+					</button>
+				{:else if notifPermission === 'denied'}
+					<p class="reach-warn">Notifikaatiot estetty. Salli selaimen asetuksista.</p>
+				{:else if notifPermission === 'granted'}
+					<p class="reach-ok">✓ Notifikaatiot sallittu</p>
+				{/if}
+			</div>
+		{/if}
+
 		<div class="rewards locked-section">
 			<p class="rewards-hint">Tee ensin iltatoimet.</p>
 			<div class="reward-grid">
@@ -495,6 +543,55 @@
 
 	.start-btn:active {
 		opacity: 0.85;
+	}
+
+	/* ── Reach (calendar / notifications) ── */
+	.reach-block {
+		display: flex;
+		flex-direction: column;
+		gap: 0.6rem;
+		padding: 1rem;
+		border-radius: 0.75rem;
+		background: var(--bg-card);
+		border: 1px solid var(--border);
+	}
+	.reach-title {
+		font-size: 0.85rem;
+		font-weight: 600;
+		color: var(--text);
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+	}
+	.reach-hint {
+		font-size: 0.85rem;
+		color: var(--text-muted);
+		line-height: 1.4;
+	}
+	.reach-btn {
+		padding: 0.85rem 1rem;
+		border-radius: 0.5rem;
+		background: var(--accent);
+		color: #fff;
+		border: none;
+		font-size: 0.95rem;
+		font-weight: 600;
+		cursor: pointer;
+	}
+	.reach-btn.secondary {
+		background: transparent;
+		color: var(--text);
+		border: 1px solid var(--border);
+	}
+	.reach-btn:active {
+		opacity: 0.85;
+	}
+	.reach-warn {
+		font-size: 0.8rem;
+		color: var(--danger);
+	}
+	.reach-ok {
+		font-size: 0.8rem;
+		color: var(--intensity-calm);
 	}
 
 	/* ── Rewards ── */
