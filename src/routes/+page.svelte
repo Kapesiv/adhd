@@ -9,6 +9,38 @@
 		startMotionDetection, stopMotionDetection
 	} from '$lib/iltavahti';
 	import { onMount, onDestroy } from 'svelte';
+	import { settings } from '$lib/core/state';
+	import {
+		calculateDeadline,
+		hoursUntilDeadline,
+		sleepIfNow,
+		getIntensityLevel,
+		formatTime
+	} from '$lib/modules/iltavahti/time-engine';
+	import {
+		handleIntensityChange,
+		stopIntensityHandler,
+		currentInteraction,
+		clearCurrentInteraction
+	} from '$lib/modules/iltavahti/intensity-handler';
+	import InteractionModal from '$lib/modules/iltavahti/InteractionModal.svelte';
+	import IntensityOverlay from '$lib/modules/iltavahti/IntensityOverlay.svelte';
+	import { downloadIcs } from '$lib/modules/iltavahti/ical';
+	import {
+		subscribeToPush,
+		unsubscribeFromPush,
+		getSubscriptionState,
+		isPushSupported,
+		isIos,
+		isStandalonePwa
+	} from '$lib/modules/iltavahti/push-client';
+	import { base } from '$app/paths';
+	import { browser } from '$app/environment';
+	import type { IntensityLevel } from '$lib/core/events';
+
+	const PUSH_BACKEND_URL = import.meta.env.VITE_PUSH_BACKEND_URL as string | undefined;
+	const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY as string | undefined;
+	const pushConfigured = !!(PUSH_BACKEND_URL && VAPID_PUBLIC_KEY);
 
 	// --- State ---
 	let now = new Date();
@@ -22,8 +54,9 @@
 	// "doing" = tapping through tasks, "idle" = streak/start view
 	let mode: 'idle' | 'doing' | 'done' = 'idle';
 
+	let level: IntensityLevel = 'calm';
+
 	onMount(() => {
-		// If today already done, go straight to done
 		const s = $iltavahti;
 		if (isTodayDone(s.completedDays ?? [])) {
 			mode = 'done';
@@ -35,7 +68,86 @@
 		releaseWakeLock();
 		stopAlarm();
 		stopMotionDetection();
+		stopIntensityHandler();
+		clearCurrentInteraction();
 	});
+
+	// Intensiteetti: laske jokaisella tikityksella
+	$: deadline = calculateDeadline($settings.wakeUpTime, $settings.sleepHours);
+	$: hoursRemaining = (() => {
+		void now;
+		return hoursUntilDeadline(deadline);
+	})();
+	$: hoursIfNow = (() => {
+		void now;
+		return sleepIfNow($settings.wakeUpTime);
+	})();
+	$: level = getIntensityLevel(hoursRemaining);
+
+	// Aktivoi handler vain kun onboarding tehty
+	$: if ($settings.onboardingDone) {
+		handleIntensityChange(level, hoursRemaining, $settings.intensityPreference);
+	}
+
+	function onInteractionDone() {
+		clearCurrentInteraction();
+	}
+
+	let calendarSaved = false;
+	function onCalendarDownload() {
+		if (!browser) return;
+		const url = window.location.origin + base + '/';
+		downloadIcs($settings, url);
+		calendarSaved = true;
+		try {
+			localStorage.setItem('iltavahti-calendar-installed', '1');
+		} catch {
+			// quota
+		}
+	}
+
+	let notifPermission: NotificationPermission | 'unsupported' = 'default';
+	$: if (browser && typeof Notification !== 'undefined') {
+		notifPermission = Notification.permission;
+	} else if (browser) {
+		notifPermission = 'unsupported';
+	}
+
+	async function requestNotifPermission() {
+		if (!browser || typeof Notification === 'undefined') return;
+		const result = await Notification.requestPermission();
+		notifPermission = result;
+	}
+
+	// --- Push subscription ---
+	let pushSubscribed = false;
+	let pushBusy = false;
+	let pushError = '';
+
+	onMount(async () => {
+		if (!browser) return;
+		const state = await getSubscriptionState();
+		pushSubscribed = state.subscribed;
+	});
+
+	async function togglePushSubscription() {
+		if (!pushConfigured || !PUSH_BACKEND_URL || !VAPID_PUBLIC_KEY) return;
+		pushBusy = true;
+		pushError = '';
+		try {
+			if (pushSubscribed) {
+				await unsubscribeFromPush(PUSH_BACKEND_URL);
+				pushSubscribed = false;
+			} else {
+				await subscribeToPush(PUSH_BACKEND_URL, VAPID_PUBLIC_KEY, $settings);
+				pushSubscribed = true;
+			}
+		} catch (err) {
+			pushError = err instanceof Error ? err.message : String(err);
+		} finally {
+			pushBusy = false;
+		}
+	}
 
 	$: state = $iltavahti;
 	$: streak = getStreak(state.completedDays ?? []);
@@ -150,7 +262,12 @@
 <!-- DOING: fullscreen tap mode -->
 {#if mode === 'doing' && !allDone}
 	<div class="full" style="background: {bg}" role="button" tabindex="0" onclick={tap} onkeydown={(e) => e.key === 'Enter' && tap()}>
-		<p class="clock">{clock(now)}</p>
+		<p class="clock">
+			{clock(now)}
+			{#if $settings.onboardingDone}
+				<span class="sleep-mini">{hoursIfNow.toFixed(1)}h</span>
+			{/if}
+		</p>
 
 		{#if alarmActive}
 			<p class="warn blink">Aika meni. Tee nyt.</p>
@@ -219,6 +336,14 @@
 			</div>
 		{/if}
 
+		{#if $settings.onboardingDone}
+			<div class="sleep-counter" data-level={level}>
+				<span class="sleep-num">{hoursIfNow.toFixed(1)}</span>
+				<span class="sleep-label">tuntia unta jos menet nyt</span>
+				<span class="deadline-row">Nukkumaan klo {formatTime(deadline)}</span>
+			</div>
+		{/if}
+
 		<div class="streak-block">
 			{#if streak > 0}
 				<div class="streak-num">{streak}</div>
@@ -241,6 +366,45 @@
 			Tee iltatoimet
 		</button>
 
+		{#if $settings.onboardingDone}
+			<div class="reach-block">
+				<p class="reach-title">Tavoittaminen</p>
+				<p class="reach-hint">Iltavahti ei voi soittaa sinulle suljettuna. Lataa kalenterimuistutukset tai tilaa push — puhelin huutaa vaikka olet TikTokissa.</p>
+				<button class="reach-btn" onclick={onCalendarDownload}>
+					{calendarSaved ? '✓ Ladattu — avaa kalenterissa' : 'Lataa kalenterimuistutukset'}
+				</button>
+
+				{#if pushConfigured && isPushSupported()}
+					{#if isIos() && !isStandalonePwa()}
+						<p class="reach-warn">iPhonella push toimii vain kun Iltavahti on lisätty kotiruutuun (Jaa → Lisää kotiruutuun).</p>
+					{:else}
+						<button
+							class="reach-btn secondary"
+							onclick={togglePushSubscription}
+							disabled={pushBusy}
+						>
+							{pushBusy
+								? 'Hetki...'
+								: pushSubscribed
+									? '✓ Push päällä — peru'
+									: 'Tilaa push-muistutukset'}
+						</button>
+						{#if pushError}
+							<p class="reach-warn">{pushError}</p>
+						{/if}
+					{/if}
+				{/if}
+
+				{#if notifPermission === 'default' && !pushConfigured}
+					<button class="reach-btn secondary" onclick={requestNotifPermission}>
+						Salli notifikaatiot tässä selaimessa
+					</button>
+				{:else if notifPermission === 'denied'}
+					<p class="reach-warn">Notifikaatiot estetty. Salli selaimen asetuksista.</p>
+				{/if}
+			</div>
+		{/if}
+
 		<div class="rewards locked-section">
 			<p class="rewards-hint">Tee ensin iltatoimet.</p>
 			<div class="reward-grid">
@@ -250,6 +414,14 @@
 			</div>
 		</div>
 	</div>
+{/if}
+
+<!-- Intensiteetti-overlay (urgent/overdue) -->
+<IntensityOverlay {level} visible={$settings.onboardingDone} />
+
+<!-- Pakotettu interaktio -->
+{#if $currentInteraction}
+	<InteractionModal interaction={$currentInteraction} on:done={onInteractionDone} />
 {/if}
 
 <style>
@@ -298,6 +470,62 @@
 		padding: 0.4rem 0.6rem;
 		font: inherit;
 		font-size: 0.9rem;
+	}
+
+	/* ── Sleep counter ── */
+	.sleep-counter {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 0.25rem;
+		padding: 1.5rem 1rem;
+		border-radius: 0.75rem;
+		background: var(--bg-card);
+		border: 1px solid var(--border);
+		text-align: center;
+		transition: border-color 0.5s, background 0.5s;
+	}
+	.sleep-counter[data-level='gentle'] {
+		border-color: var(--intensity-gentle);
+	}
+	.sleep-counter[data-level='warning'] {
+		border-color: var(--intensity-warning);
+		background: rgba(255, 112, 67, 0.08);
+	}
+	.sleep-counter[data-level='urgent'] {
+		border-color: var(--intensity-urgent);
+		background: rgba(255, 82, 82, 0.12);
+	}
+	.sleep-counter[data-level='overdue'] {
+		border-color: var(--intensity-overdue);
+		background: rgba(224, 64, 251, 0.12);
+	}
+	.sleep-num {
+		font-size: 3.5rem;
+		font-weight: 200;
+		font-variant-numeric: tabular-nums;
+		line-height: 1;
+		background: linear-gradient(45deg, #fff, #7eb2ff);
+		-webkit-background-clip: text;
+		-webkit-text-fill-color: transparent;
+		background-clip: text;
+	}
+	.sleep-label {
+		font-size: 0.85rem;
+		color: var(--text-muted);
+	}
+	.deadline-row {
+		font-size: 0.75rem;
+		color: var(--text-muted);
+		margin-top: 0.4rem;
+	}
+	.sleep-mini {
+		display: inline-block;
+		margin-left: 0.6rem;
+		font-size: 0.95rem;
+		color: var(--text);
+		opacity: 0.6;
+		font-variant-numeric: tabular-nums;
 	}
 
 	/* ── Streak ── */
@@ -377,6 +605,51 @@
 
 	.start-btn:active {
 		opacity: 0.85;
+	}
+
+	/* ── Reach (calendar / notifications) ── */
+	.reach-block {
+		display: flex;
+		flex-direction: column;
+		gap: 0.6rem;
+		padding: 1rem;
+		border-radius: 0.75rem;
+		background: var(--bg-card);
+		border: 1px solid var(--border);
+	}
+	.reach-title {
+		font-size: 0.85rem;
+		font-weight: 600;
+		color: var(--text);
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+	}
+	.reach-hint {
+		font-size: 0.85rem;
+		color: var(--text-muted);
+		line-height: 1.4;
+	}
+	.reach-btn {
+		padding: 0.85rem 1rem;
+		border-radius: 0.5rem;
+		background: var(--accent);
+		color: #fff;
+		border: none;
+		font-size: 0.95rem;
+		font-weight: 600;
+		cursor: pointer;
+	}
+	.reach-btn.secondary {
+		background: transparent;
+		color: var(--text);
+		border: 1px solid var(--border);
+	}
+	.reach-btn:active {
+		opacity: 0.85;
+	}
+	.reach-warn {
+		font-size: 0.8rem;
+		color: var(--danger);
 	}
 
 	/* ── Rewards ── */
