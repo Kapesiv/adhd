@@ -1,98 +1,34 @@
 <script lang="ts">
 	import '../app.css';
-	import { page } from '$app/stores';
 	import { browser } from '$app/environment';
 	import { base } from '$app/paths';
+	import { goto } from '$app/navigation';
+	import { page } from '$app/stores';
+	import { onMount } from 'svelte';
 
 	if (browser && 'serviceWorker' in navigator) {
 		navigator.serviceWorker.register(`${base}/sw.js`);
 	}
 
-	const navItems = [
-		{ label: 'Koti', href: `${base}/` },
-		{ label: 'Iltavahti', href: `${base}/iltavahti` },
-		{ label: 'Asetukset', href: `${base}/asetukset` }
-	];
-
 	let { children } = $props();
+
+	// Onboarding-tarkistus: ohjaa /tervetuloa jos ei valmis
+	onMount(() => {
+		const done = localStorage.getItem('onboardingComplete');
+		const path = $page.url.pathname;
+		const isOnboarding = path.startsWith(`${base}/tervetuloa`);
+		const isSettings = path.startsWith(`${base}/asetukset`);
+
+		if (!done && !isOnboarding && !isSettings) {
+			goto(`${base}/tervetuloa`, { replaceState: true });
+		}
+	});
 </script>
 
-<div class="app-shell">
-	<main class="content">
-		{@render children()}
-	</main>
-
-	<nav class="tab-bar">
-		{#each navItems as item}
-			<a
-				href={item.href}
-				class="tab-item"
-				class:active={$page.url.pathname === item.href}
-			>
-				{item.label}
-			</a>
-		{/each}
-	</nav>
-</div>
+{@render children()}
 
 <style>
-	.app-shell {
-		display: flex;
-		flex-direction: column;
-		min-height: 100vh;
-		min-height: 100dvh;
-	}
-
-	.content {
-		flex: 1;
-		width: 100%;
-		max-width: var(--max-width);
-		margin: 0 auto;
-		padding: 2rem;
-		padding-bottom: 5rem;
-	}
-
-	.tab-bar {
-		position: fixed;
-		bottom: 0;
-		left: 0;
-		right: 0;
-		display: flex;
-		justify-content: center;
-		gap: 2rem;
-		background: var(--bg-nav);
-		border-top: 1px solid var(--border);
-		padding: 0.75rem 1rem;
-		padding-bottom: calc(0.75rem + env(safe-area-inset-bottom, 0));
-		z-index: 100;
-	}
-
-	.tab-item {
-		text-decoration: none;
-		color: var(--text-muted);
-		font-size: 0.85rem;
-		font-weight: 500;
-		transition: color 0.15s;
-	}
-
-	.tab-item.active {
-		color: var(--text);
-	}
-
-	@media (max-width: 640px) {
-		.content {
-			padding: 1.25rem 1rem;
-			padding-bottom: 5rem;
-		}
-
-		.tab-bar {
-			gap: 0;
-		}
-
-		.tab-item {
-			flex: 1;
-			text-align: center;
-			font-size: 0.8rem;
-		}
+	:global(body) {
+		overflow-x: hidden;
 	}
 </style>
