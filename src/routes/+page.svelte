@@ -1035,6 +1035,7 @@
 		align-items: flex-start;
 		gap: 0.75rem;
 		max-width: min(22rem, calc(100vw - 2rem));
+		pointer-events: none;
 	}
 
 	.help-fab {
@@ -1051,6 +1052,7 @@
 		cursor: pointer;
 		font-size: 0.88rem;
 		font-weight: 600;
+		pointer-events: auto;
 	}
 
 	.help-fab-icon {
@@ -1074,6 +1076,7 @@
 		border: 1px solid rgb(249 115 22 / 0.2);
 		box-shadow: 0 20px 60px rgb(0 0 0 / 0.34);
 		backdrop-filter: blur(14px);
+		pointer-events: auto;
 	}
 
 	.help-head {
