@@ -34,6 +34,7 @@
 	const PUSH_BACKEND_URL = import.meta.env.VITE_PUSH_BACKEND_URL as string | undefined;
 	const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY as string | undefined;
 	const pushConfigured = !!(PUSH_BACKEND_URL && VAPID_PUBLIC_KEY);
+	const fullscreenTaskModeEnabled = false;
 
 	// --- State ---
 	let now = new Date();
@@ -63,6 +64,7 @@
 	// a) notifikaatiosta tuli ?autostart=1, TAI
 	// b) nukkumaanmenoaika on mennyt ja iltatoimet tekemättä
 	$: if (
+		fullscreenTaskModeEnabled &&
 		!autoStartChecked &&
 		browser &&
 		mode === 'idle' &&
@@ -231,6 +233,10 @@
 	}
 
 	function startTasks() {
+		if (!fullscreenTaskModeEnabled) {
+			return;
+		}
+
 		mode = 'doing';
 		requestWakeLock();
 	}
@@ -412,9 +418,18 @@
 			</div>
 		</div>
 
-		<button class="start-btn" onclick={startTasks}>
-			Tee iltatoimet
-		</button>
+		{#if fullscreenTaskModeEnabled}
+			<button class="start-btn" onclick={startTasks}>
+				Tee iltatoimet
+			</button>
+		{:else}
+			<div class="start-disabled">
+				<p class="start-disabled-title">Tämä koko ruudun tehtävätila on nyt tauolla.</p>
+				<p class="start-disabled-text">
+					Otin sen väliaikaisesti pois käytöstä, jotta sivu ei lukitse näkymää tuohon pakottavaan tilaan.
+				</p>
+			</div>
+		{/if}
 
 		{#if $settings.onboardingDone}
 			{#if isIos() && !isStandalonePwa()}
@@ -764,6 +779,28 @@
 
 	.start-btn:active {
 		opacity: 0.85;
+	}
+
+	.start-disabled {
+		padding: 1rem 1.05rem;
+		border-radius: 0.75rem;
+		background: var(--bg-card);
+		border: 1px dashed rgb(249 115 22 / 0.35);
+		display: flex;
+		flex-direction: column;
+		gap: 0.35rem;
+	}
+
+	.start-disabled-title {
+		font-size: 0.98rem;
+		font-weight: 700;
+		color: var(--text);
+	}
+
+	.start-disabled-text {
+		font-size: 0.85rem;
+		line-height: 1.45;
+		color: var(--text-muted);
 	}
 
 	/* ── Install guide (iOS home screen) ── */
