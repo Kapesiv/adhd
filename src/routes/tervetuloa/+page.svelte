@@ -1,5 +1,8 @@
+<svelte:options runes={false} />
+
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { base } from '$app/paths';
 	import { settings, type IntensityPreference } from '$lib/core/state';
 	import { saveSettings } from '$lib/core/storage';
 
@@ -58,7 +61,7 @@
 		};
 		settings.set(newSettings);
 		await saveSettings(newSettings);
-		await goto('/iltavahti');
+		await goto(`${base}/`);
 	}
 </script>
 

@@ -3,13 +3,29 @@
 	--bg-card: #1a1d23;
 	--bg-nav: #161920;
 	--field: #1a1d23;
+	--input-bg: #1a1d23;
+	--border: #27272a;
+	--border-card: #27272a;
 	--pill: rgb(255 255 255 / 0.06);
 	--text: #e4e4e7;
+	--text-dim: #a1a1aa;
 	--text-muted: #71717a;
 	--accent: #f97316;
 	--accent-dim: rgb(249 115 22 / 0.15);
-	--border: #27272a;
+	--danger: #f87171;
 	--max-width: 1200px;
+
+	/* Intensiteettitasot */
+	--intensity-calm: #7eb2ff;
+	--intensity-gentle: #ffab40;
+	--intensity-warning: #ff7043;
+	--intensity-urgent: #ff5252;
+	--intensity-overdue: #e040fb;
+
+	/* Radii */
+	--radius-sm: 0.5rem;
+	--radius-md: 0.75rem;
+	--radius-lg: 1rem;
 }
 
 * {
