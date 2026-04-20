@@ -8,7 +8,6 @@ export interface Task {
 }
 
 export interface IltavahtiState {
-	bedtime: string;
 	tasks: Task[];
 	lastResetDate: string;
 	// Streak: lista päivämääristä jolloin iltatoimet tehtiin
@@ -38,7 +37,6 @@ function todayStr() {
 
 function seedState(): IltavahtiState {
 	return {
-		bedtime: '23:00',
 		tasks: defaultTasks.map((t) => ({ ...t, id: createId() })),
 		lastResetDate: todayStr(),
 		completedDays: []
@@ -53,6 +51,9 @@ function loadState(): IltavahtiState {
 		if (!saved) return seedState();
 
 		const parsed = JSON.parse(saved) as IltavahtiState;
+
+		// Migraatio: poista vanha bedtime-kenttä
+		if ('bedtime' in parsed) delete (parsed as any).bedtime;
 
 		if (parsed.lastResetDate !== todayStr()) {
 			return {
@@ -91,10 +92,6 @@ function createIltavahtiStore() {
 					: s.completedDays;
 				return { ...s, tasks: newTasks, completedDays: days };
 			});
-		},
-
-		setBedtime(time: string) {
-			update((s) => ({ ...s, bedtime: time }));
 		},
 
 		addTask(label: string) {

@@ -9,7 +9,7 @@
 		startMotionDetection, stopMotionDetection
 	} from '$lib/iltavahti';
 	import { onMount, onDestroy } from 'svelte';
-	import { settings } from '$lib/core/state';
+	import { settings, type UserSettings } from '$lib/core/state';
 	import {
 		calculateDeadline,
 		hoursUntilDeadline,
@@ -26,6 +26,7 @@
 	import InteractionModal from '$lib/modules/iltavahti/InteractionModal.svelte';
 	import IntensityOverlay from '$lib/modules/iltavahti/IntensityOverlay.svelte';
 	import { downloadIcs } from '$lib/modules/iltavahti/ical';
+	import { saveSettings } from '$lib/core/storage';
 	import {
 		subscribeToPush,
 		unsubscribeFromPush,
@@ -111,9 +112,13 @@
 	})();
 	$: level = getIntensityLevel(hoursRemaining);
 
-	// Aktivoi handler vain kun onboarding tehty
-	$: if ($settings.onboardingDone) {
+	// Aktivoi handler vain idle-tilassa (doing-tilassa käyttäjä tekee jo tehtäviä)
+	$: if ($settings.onboardingDone && mode !== 'doing') {
 		handleIntensityChange(level, hoursRemaining, $settings.intensityPreference);
+	}
+	$: if (mode === 'doing') {
+		stopIntensityHandler();
+		clearCurrentInteraction();
 	}
 
 	function onInteractionDone() {
@@ -188,14 +193,8 @@
 		mode = 'done';
 	}
 
-	// Bedtime logic
-	$: bedtimeParts = state.bedtime.split(':').map(Number);
-	$: bedtimeToday = (() => {
-		const d = new Date();
-		d.setHours(bedtimeParts[0], bedtimeParts[1], 0, 0);
-		return d;
-	})();
-	$: minutesLeft = Math.round((bedtimeToday.getTime() - now.getTime()) / 60000);
+	// Bedtime logic (deadline from settings store)
+	$: minutesLeft = Math.round((deadline.getTime() - now.getTime()) / 60000);
 	$: overTime = minutesLeft <= 0;
 
 	// Alarm when overtime and still doing tasks
@@ -245,6 +244,13 @@
 		{ label: 'X', url: 'https://x.com' }
 	];
 
+	function backToIdle() {
+		mode = 'idle';
+		releaseWakeLock();
+		stopAlarm();
+		alarmActive = false;
+	}
+
 	function startTasks() {
 		mode = 'doing';
 		requestWakeLock();
@@ -279,6 +285,14 @@
 
 	function clock(d: Date) {
 		return d.toLocaleTimeString('fi-FI', { hour: '2-digit', minute: '2-digit' });
+	}
+
+	function updateSetting<K extends keyof UserSettings>(key: K, value: UserSettings[K]) {
+		settings.update((s) => {
+			const next = { ...s, [key]: value };
+			saveSettings(next);
+			return next;
+		});
 	}
 </script>
 
@@ -318,7 +332,7 @@
 	</div>
 
 <!-- DONE: goodnight + rewards -->
-{:else if mode === 'done' || todayDone}
+{:else if mode === 'done'}
 	<div class="page">
 		<div class="done-top">
 			<p class="done-clock">{clock(now)}</p>
@@ -340,6 +354,8 @@
 				{/each}
 			</div>
 		</div>
+
+		<button class="back-btn" onclick={backToIdle}>Takaisin</button>
 	</div>
 
 <!-- IDLE: streak + start -->
@@ -355,12 +371,38 @@
 		{#if showSettings}
 			<div class="settings-panel">
 				<label class="setting-row">
-					<span>Nukkumaanmeno</span>
+					<span>Herätys</span>
 					<input
 						type="time"
-						value={state.bedtime}
-						onchange={(e) => iltavahti.setBedtime((e.currentTarget as HTMLInputElement).value)}
+						value={$settings.wakeUpTime}
+						onchange={(e) => updateSetting('wakeUpTime', (e.currentTarget as HTMLInputElement).value)}
 					/>
+				</label>
+
+				<div class="setting-row">
+					<span>Unen tarve</span>
+					<div class="stepper">
+						<button class="step-btn" onclick={() => updateSetting('sleepHours', Math.max(5, $settings.sleepHours - 0.5))}>−</button>
+						<span class="step-val">{$settings.sleepHours} h</span>
+						<button class="step-btn" onclick={() => updateSetting('sleepHours', Math.min(10, $settings.sleepHours + 0.5))}>+</button>
+					</div>
+				</div>
+
+				<div class="setting-row">
+					<span>Nukkumaanmeno</span>
+					<span class="computed-val">{formatTime(deadline)}</span>
+				</div>
+
+				<label class="setting-row">
+					<span>Painostus</span>
+					<select
+						value={$settings.intensityPreference}
+						onchange={(e) => updateSetting('intensityPreference', (e.currentTarget as HTMLSelectElement).value as UserSettings['intensityPreference'])}
+					>
+						<option value="light">Kevyt</option>
+						<option value="medium">Keskikova</option>
+						<option value="hard">Kova</option>
+					</select>
 				</label>
 			</div>
 		{/if}
@@ -459,10 +501,10 @@
 {/if}
 
 <!-- Intensiteetti-overlay (urgent/overdue) -->
-<IntensityOverlay {level} visible={$settings.onboardingDone} />
+<IntensityOverlay {level} visible={$settings.onboardingDone && mode !== 'doing'} />
 
-<!-- Pakotettu interaktio -->
-{#if $currentInteraction}
+<!-- Pakotettu interaktio (ei doing-tilassa) -->
+{#if $currentInteraction && mode !== 'doing'}
 	<InteractionModal interaction={$currentInteraction} on:done={onInteractionDone} />
 {/if}
 
@@ -504,6 +546,9 @@
 	}
 
 	.settings-panel {
+		display: flex;
+		flex-direction: column;
+		gap: 0.75rem;
 		background: var(--bg-card);
 		border: 1px solid var(--border);
 		border-radius: 0.75rem;
@@ -517,7 +562,8 @@
 		font-size: 0.9rem;
 	}
 
-	.setting-row input[type='time'] {
+	.setting-row input[type='time'],
+	.setting-row select {
 		background: var(--field);
 		color: var(--text);
 		border: 1px solid var(--border);
@@ -525,6 +571,39 @@
 		padding: 0.4rem 0.6rem;
 		font: inherit;
 		font-size: 0.9rem;
+	}
+
+	.stepper {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+	}
+
+	.step-btn {
+		width: 2rem;
+		height: 2rem;
+		border-radius: 0.4rem;
+		border: 1px solid var(--border);
+		background: var(--field);
+		color: var(--text);
+		font-size: 1.1rem;
+		cursor: pointer;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.step-val {
+		font-size: 0.9rem;
+		font-variant-numeric: tabular-nums;
+		min-width: 3rem;
+		text-align: center;
+	}
+
+	.computed-val {
+		font-size: 0.9rem;
+		color: var(--accent);
+		font-weight: 600;
 	}
 
 	/* ── Sleep counter ── */
@@ -834,6 +913,18 @@
 		border-radius: 2rem;
 		font-size: 0.85rem;
 		font-weight: 600;
+	}
+
+	.back-btn {
+		background: none;
+		border: 1px solid var(--border);
+		color: var(--text-muted);
+		font-size: 0.85rem;
+		padding: 0.6rem 1.2rem;
+		border-radius: 0.5rem;
+		cursor: pointer;
+		align-self: center;
+		margin-top: auto;
 	}
 
 	/* ── Fullscreen task mode ── */
