@@ -1,3 +1,9 @@
+# ADHD-app
+
+Projektin tausta ja periaatteet: katso [docs/CONTEXT.md](docs/CONTEXT.md).
+
+---
+
 # sv
 
 Everything you need to build a Svelte project, powered by [`sv`](https://github.com/sveltejs/cli).
