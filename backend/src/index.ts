@@ -7,6 +7,7 @@ export interface Env {
 	VAPID_PRIVATE_KEY: string;
 	VAPID_SUBJECT: string;
 	CORS_ORIGIN: string;
+	APP_URL?: string;
 }
 
 // --------------------------------------------------------------- helpers
@@ -157,10 +158,11 @@ async function handleMessage(req: Request, env: Env): Promise<Response> {
 		.bind(id)
 		.first<{ title: string; body: string; url: string }>();
 	if (!row) {
+		const fallbackUrl = (env.APP_URL || `${env.CORS_ORIGIN}/adhd/`).replace(/\/?$/, '/');
 		return jsonResponse(env, {
 			title: 'Iltavahti',
 			body: 'Aika rauhoittua.',
-			url: env.CORS_ORIGIN || '/'
+			url: fallbackUrl
 		});
 	}
 	// Consume: delete after read so next push lookup is fresh
@@ -295,7 +297,7 @@ async function runCron(env: Env): Promise<void> {
 	if (!subs.results || subs.results.length === 0) return;
 
 	const keys = getVapidKeys(env);
-	const appUrl = env.CORS_ORIGIN || '/';
+	const appUrl = (env.APP_URL || `${env.CORS_ORIGIN}/adhd/`).replace(/\/?$/, '/');
 
 	for (const sub of subs.results) {
 		const nowLocalMin = localMinutesNow(nowMs, sub.tz_offset_minutes);
@@ -313,7 +315,9 @@ async function runCron(env: Env): Promise<void> {
 			if (await wasSentThisSlot(env.DB, sub.id, slot.key, nowMs)) continue;
 
 			const msg = pickMessage(slot.key, dayKey + slot.minutesBefore);
-			await stagePendingMessage(env.DB, sub.id, msg, appUrl, nowMs);
+			const deepLink =
+				slot.key === 'pre30' || slot.key === 'now' ? `${appUrl}?autostart=1` : appUrl;
+			await stagePendingMessage(env.DB, sub.id, msg, deepLink, nowMs);
 
 			const subscription: PushSubscription = {
 				endpoint: sub.endpoint,

@@ -56,12 +56,39 @@
 
 	let level: IntensityLevel = 'calm';
 
+	let autoStartChecked = false;
+
 	onMount(() => {
 		const s = $iltavahti;
 		if (isTodayDone(s.completedDays ?? [])) {
 			mode = 'done';
 		}
 	});
+
+	// Auto-start doing-tilaan settingsien latauduttua:
+	// a) notifikaatiosta tuli ?autostart=1, TAI
+	// b) nukkumaanmenoaika on mennyt ja iltatoimet tekemättä
+	$: if (
+		!autoStartChecked &&
+		browser &&
+		mode === 'idle' &&
+		$settings.onboardingDone &&
+		state.tasks.length > 0 &&
+		!isTodayDone(state.completedDays ?? [])
+	) {
+		autoStartChecked = true;
+		const url = new URL(window.location.href);
+		const autoRequested = url.searchParams.get('autostart') === '1';
+		const past = hoursRemaining <= 0;
+		if (autoRequested || past) {
+			mode = 'doing';
+			requestWakeLock();
+			if (autoRequested) {
+				url.searchParams.delete('autostart');
+				history.replaceState({}, '', url.toString());
+			}
+		}
+	}
 
 	onDestroy(() => {
 		clearInterval(timer);
@@ -318,10 +345,12 @@
 <!-- IDLE: streak + start -->
 {:else}
 	<div class="page">
-		<!-- Settings toggle -->
-		<button class="settings-btn" onclick={() => showSettings = !showSettings}>
-			{showSettings ? 'Sulje' : 'Asetukset'}
-		</button>
+		<div class="idle-top">
+			<p class="idle-clock">{clock(now)}</p>
+			<button class="settings-btn" onclick={() => showSettings = !showSettings}>
+				{showSettings ? 'Sulje' : 'Asetukset'}
+			</button>
+		</div>
 
 		{#if showSettings}
 			<div class="settings-panel">
@@ -450,9 +479,22 @@
 		min-height: 100dvh;
 	}
 
+	/* ── Idle top ── */
+	.idle-top {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+	}
+	.idle-clock {
+		font-size: 1.8rem;
+		font-weight: 300;
+		font-variant-numeric: tabular-nums;
+		color: var(--text);
+		letter-spacing: 0.05em;
+	}
+
 	/* ── Settings ── */
 	.settings-btn {
-		align-self: flex-end;
 		background: none;
 		border: none;
 		color: var(--text-muted);
