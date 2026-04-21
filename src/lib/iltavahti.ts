@@ -5,6 +5,7 @@ export interface Task {
 	id: string;
 	label: string;
 	done: boolean;
+	priority: 'critical' | 'normal';
 }
 
 export interface IltavahtiState {
@@ -17,11 +18,11 @@ export interface IltavahtiState {
 const STORAGE_KEY = 'adhd-iltavahti';
 
 const defaultTasks: Omit<Task, 'id'>[] = [
-	{ label: 'Sammuta ylimääräiset ruudut', done: false },
-	{ label: 'Laita puhelin laturiin', done: false },
-	{ label: 'Pese hampaat', done: false },
-	{ label: 'Valmista aamun vaatteet', done: false },
-	{ label: 'Mene sänkyyn', done: false }
+	{ label: 'Sammuta ylimääräiset ruudut', done: false, priority: 'normal' },
+	{ label: 'Laita puhelin laturiin', done: false, priority: 'normal' },
+	{ label: 'Pese hampaat', done: false, priority: 'critical' },
+	{ label: 'Valmista aamun vaatteet', done: false, priority: 'normal' },
+	{ label: 'Mene sänkyyn', done: false, priority: 'critical' }
 ];
 
 function createId() {
@@ -55,6 +56,13 @@ function loadState(): IltavahtiState {
 		// Migraatio: poista vanha bedtime-kenttä
 		if ('bedtime' in parsed) delete (parsed as any).bedtime;
 
+		// Migraatio: lisää priority vanhoihin taskeihin
+		const criticalLabels = ['Pese hampaat', 'Mene sänkyyn'];
+		parsed.tasks = parsed.tasks.map((t) => ({
+			...t,
+			priority: t.priority ?? (criticalLabels.includes(t.label) ? 'critical' : 'normal')
+		}));
+
 		if (parsed.lastResetDate !== todayStr()) {
 			return {
 				...parsed,
@@ -83,14 +91,17 @@ function createIltavahtiStore() {
 		subscribe,
 
 		markDone(taskId: string) {
+			update((s) => ({
+				...s,
+				tasks: s.tasks.map((t) => (t.id === taskId ? { ...t, done: true } : t))
+			}));
+		},
+
+		completeToday() {
 			update((s) => {
-				const newTasks = s.tasks.map((t) => (t.id === taskId ? { ...t, done: true } : t));
-				const allDone = newTasks.every((t) => t.done);
 				const today = todayStr();
-				const days = allDone && !s.completedDays.includes(today)
-					? [...s.completedDays, today]
-					: s.completedDays;
-				return { ...s, tasks: newTasks, completedDays: days };
+				if (s.completedDays.includes(today)) return s;
+				return { ...s, completedDays: [...s.completedDays, today] };
 			});
 		},
 

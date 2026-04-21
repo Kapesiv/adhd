@@ -40,6 +40,7 @@
 	let showHelp = false;
 
 	let mode: 'idle' | 'done' = 'idle';
+	let showAll = false;
 
 	let level: IntensityLevel = 'calm';
 
@@ -147,11 +148,20 @@
 		return messages[seed % messages.length];
 	}
 	$: dateSeed = new Date().getDate();
-	$: remaining = state.tasks.filter((t) => !t.done);
-	$: allDone = state.tasks.length > 0 && remaining.length === 0;
+	// Adaptiivinen: näytä taskit kellonajan mukaan
+	$: criticalOnly = hoursRemaining < 1;
+	$: visibleTasks = showAll
+		? state.tasks
+		: criticalOnly
+			? state.tasks.filter((t) => t.priority === 'critical')
+			: state.tasks;
+	$: hiddenCount = state.tasks.length - visibleTasks.length;
+	$: remaining = visibleTasks.filter((t) => !t.done);
+	$: allDone = visibleTasks.length > 0 && remaining.length === 0;
 
-	// Switch to done mode when all tasks completed
+	// Switch to done mode when all visible tasks completed
 	$: if (allDone && mode === 'idle') {
+		iltavahti.completeToday();
 		mode = 'done';
 	}
 
@@ -303,7 +313,11 @@
 		</div>
 
 		<div class="checklist">
-			{#each state.tasks as task}
+			{#if criticalOnly && !showAll}
+				<p class="checklist-hint">Myöhä jo — nämä riittää tänään.</p>
+			{/if}
+
+			{#each visibleTasks as task}
 				<button
 					class="check-item"
 					class:checked={task.done}
@@ -314,6 +328,12 @@
 					<span class="check-label">{task.label}</span>
 				</button>
 			{/each}
+
+			{#if hiddenCount > 0}
+				<button class="show-more-btn" onclick={() => showAll = !showAll}>
+					{showAll ? 'Näytä vain tärkeät' : `+${hiddenCount} muuta`}
+				</button>
+			{/if}
 		</div>
 
 		{#if $settings.onboardingDone}
@@ -771,6 +791,31 @@
 	.check-item.checked .check-label {
 		text-decoration: line-through;
 		text-decoration-color: var(--text-muted);
+	}
+
+	.checklist-hint {
+		font-size: 0.82rem;
+		color: var(--text-muted);
+		text-align: center;
+		padding: 0.25rem 0;
+		font-weight: 300;
+		letter-spacing: 0.02em;
+	}
+
+	.show-more-btn {
+		background: none;
+		border: 1px dashed rgba(255, 255, 255, 0.08);
+		color: var(--text-muted);
+		font-size: 0.8rem;
+		padding: 0.7rem;
+		border-radius: var(--radius-md);
+		cursor: pointer;
+		text-align: center;
+		transition: border-color 0.2s, color 0.2s;
+	}
+	.show-more-btn:active {
+		border-color: var(--border);
+		color: var(--text-dim);
 	}
 
 	/* ── Install guide ── */
