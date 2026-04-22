@@ -31,10 +31,12 @@
 	import type { IntensityLevel } from '$lib/core/events';
 
 	type EveningMode = 'auto' | 'normal' | 'stuck' | 'emergency';
+	type SetupStep = 1 | 2 | 3;
 
 	const PUSH_BACKEND_URL = import.meta.env.VITE_PUSH_BACKEND_URL as string | undefined;
 	const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY as string | undefined;
 	const pushConfigured = !!(PUSH_BACKEND_URL && VAPID_PUBLIC_KEY);
+	const distractionOptions = ['TikTok', 'Instagram', 'Reddit', 'YouTube', 'Safari', 'X'];
 	// --- State ---
 	let now = new Date();
 	const timer = setInterval(() => (now = new Date()), 1000);
@@ -45,8 +47,10 @@
 	let mode: 'idle' | 'done' = 'idle';
 	let showAll = false;
 	let eveningMode: EveningMode = 'auto';
+	let setupStep: SetupStep = 1;
 	let stuckTaskId = '';
 	let stuckStepIndex = 0;
+	let distractionApps = ['TikTok', 'Instagram', 'Reddit'];
 
 	let level: IntensityLevel = 'calm';
 
@@ -281,6 +285,14 @@
 		goto(`${base}/tervetuloa`);
 	}
 
+	function toggleDistractionApp(label: string) {
+		if (distractionApps.includes(label)) {
+			distractionApps = distractionApps.filter((item) => item !== label);
+			return;
+		}
+		distractionApps = [...distractionApps, label];
+	}
+
 	function advanceStuckStep() {
 		if (!stuckTargetTask) return;
 		if (stuckStepIndex < stuckSteps.length - 1) {
@@ -470,54 +482,103 @@
 		</div>
 
 		{#if $settings.onboardingDone}
-			{#if isIos() && !isStandalonePwa()}
-				<div class="install-block">
-					<p class="install-title">Asenna Concentra kotiruutuun</p>
-					<p class="install-hint">iPhonella push-muistutukset toimivat <b>vain</b> kun sovellus on avattu kotiruudulta. Tee näin:</p>
-					<ol class="install-steps">
-						<li><span class="step-num">1</span> Paina <span class="pill">Jaa <span class="share-ico">⎙</span></span> Safarin alapalkista</li>
-						<li><span class="step-num">2</span> Valitse <span class="pill">Lisää Koti-valikkoon</span></li>
-						<li><span class="step-num">3</span> Paina <span class="pill">Lisää</span> oikeassa yläkulmassa</li>
-						<li><span class="step-num">4</span> Avaa Concentra kotiruudun ikonista</li>
-					</ol>
+			<div class="iphone-setup-block">
+				<div class="setup-head">
+					<div>
+						<p class="setup-kicker">IPhone-ilta-setup</p>
+						<h2>
+							{#if setupStep === 1}
+								Valitse häiriöappit
+							{:else if setupStep === 2}
+								Laita muistutukset päälle
+							{:else}
+								Laita iltasuoja iPhoneen
+							{/if}
+						</h2>
+					</div>
+					<div class="setup-dots" aria-label="Setupin eteneminen">
+						<span class:active={setupStep === 1}></span>
+						<span class:active={setupStep === 2}></span>
+						<span class:active={setupStep === 3}></span>
+					</div>
 				</div>
-			{/if}
 
-			<div class="reach-block">
-				<p class="reach-title">Tavoittaminen</p>
-				<p class="reach-hint">Concentra ei voi soittaa sinulle suljettuna. Lataa kalenterimuistutukset tai tilaa push — puhelin huutaa vaikka olet TikTokissa.</p>
-				<button class="reach-btn" onclick={onCalendarDownload}>
-					{calendarSaved ? '✓ Ladattu — avaa kalenterissa' : 'Lataa kalenterimuistutukset'}
-				</button>
-
-				{#if pushConfigured && isPushSupported()}
+				{#if setupStep === 1}
+					<p class="setup-text">Valitse vain ne appit, jotka vievät sinut pois iltarutiinista. Ei tarvitse valita kaikkea.</p>
+					<div class="setup-app-grid">
+						{#each distractionOptions as app}
+							<button class:selected={distractionApps.includes(app)} onclick={() => toggleDistractionApp(app)}>
+								{app}
+							</button>
+						{/each}
+					</div>
+					<p class="setup-note">Näitä käytetään seuraavassa vaiheessa, kun laitat iPhonelle iltarajat.</p>
+				{:else if setupStep === 2}
 					{#if isIos() && !isStandalonePwa()}
-						<p class="reach-warn">Asenna ensin kotiruutuun yllä olevien ohjeiden mukaan.</p>
+						<p class="setup-text">Jotta muistutukset toimivat iPhonessa kunnolla, avaa Concentra kotinäytöltä appina.</p>
+						<div class="setup-steps">
+							<div class="setup-step"><span class="step-num">1</span><span>Paina Safarissa <span class="pill">Jaa ⎙</span></span></div>
+							<div class="setup-step"><span class="step-num">2</span><span>Valitse <span class="pill">Lisää Koti-valikkoon</span></span></div>
+							<div class="setup-step"><span class="step-num">3</span><span>Avaa Concentra kotinäytön ikonista</span></div>
+						</div>
 					{:else}
+						<p class="setup-text">Laita muistutukset päälle, jotta Concentra voi pysäyttää sinut oikealla hetkellä.</p>
 						<button
-							class="reach-btn secondary"
-							onclick={togglePushSubscription}
+							class="reach-btn"
+							onclick={pushConfigured && isPushSupported() ? togglePushSubscription : requestNotifPermission}
 							disabled={pushBusy}
 						>
-							{pushBusy
-								? 'Hetki...'
-								: pushSubscribed
-									? '✓ Push päällä — peru'
-									: 'Tilaa push-muistutukset'}
+							{#if pushConfigured && isPushSupported()}
+								{pushBusy
+									? 'Hetki...'
+									: pushSubscribed
+										? '✓ Muistutukset päällä'
+										: 'Laita muistutukset päälle'}
+							{:else}
+								Salli ilmoitukset tässä selaimessa
+							{/if}
 						</button>
 						{#if pushError}
 							<p class="reach-warn">{pushError}</p>
+						{:else if notifPermission === 'denied'}
+							<p class="reach-warn">Ilmoitukset on estetty. Salli ne iPhonen asetuksista.</p>
 						{/if}
 					{/if}
+				{:else}
+					<p class="setup-text">Tee tämä kerran iPhonessa, niin ilta ei karkaa yhtä helposti käsistä.</p>
+					<div class="setup-steps">
+						<div class="setup-step">
+							<span class="step-num">1</span>
+							<span>Avaa <span class="pill">Asetukset</span> → <span class="pill">Ruutuaika</span> → <span class="pill">Appirajat</span></span>
+						</div>
+						<div class="setup-step">
+							<span class="step-num">2</span>
+							<span>Lisää nämä appit rajalle:</span>
+						</div>
+					</div>
+					<div class="setup-selected">
+						{#each distractionApps as app}
+							<span>{app}</span>
+						{/each}
+					</div>
+					<p class="setup-note">Jos haluat kovemman stopin, pidä appia pohjassa ja valitse <b>Vaadi Face ID</b>.</p>
+					<button class="reach-btn secondary" onclick={onCalendarDownload}>
+						{calendarSaved ? '✓ Kalenteri ladattu' : 'Lataa varmuudeksi kalenterimuistutukset'}
+					</button>
 				{/if}
 
-				{#if notifPermission === 'default' && !pushConfigured}
-					<button class="reach-btn secondary" onclick={requestNotifPermission}>
-						Salli notifikaatiot tässä selaimessa
-					</button>
-				{:else if notifPermission === 'denied'}
-					<p class="reach-warn">Notifikaatiot estetty. Salli selaimen asetuksista.</p>
-				{/if}
+				<div class="setup-nav">
+					{#if setupStep > 1}
+						<button class="reach-btn secondary" onclick={() => (setupStep = (setupStep - 1) as SetupStep)}>
+							Takaisin
+						</button>
+					{/if}
+					{#if setupStep < 3}
+						<button class="reach-btn" onclick={() => (setupStep = (setupStep + 1) as SetupStep)}>
+							Jatka
+						</button>
+					{/if}
+				</div>
 			</div>
 		{/if}
 
@@ -1055,40 +1116,131 @@
 		color: var(--text-dim);
 	}
 
-	/* ── Install guide ── */
-	.install-block {
-		padding: 1.25rem;
-		border-radius: var(--radius-xl);
-		background: linear-gradient(135deg, rgba(249, 115, 22, 0.1), rgba(249, 115, 22, 0.03));
-		border: 1px solid rgba(249, 115, 22, 0.2);
-	}
-	.install-title {
-		font-size: 0.95rem;
-		font-weight: 700;
-		color: var(--text);
-		margin-bottom: 0.5rem;
-	}
-	.install-hint {
-		font-size: 0.82rem;
-		color: var(--text-muted);
-		margin-bottom: 0.9rem;
-		line-height: 1.5;
-	}
-	.install-steps {
-		list-style: none;
-		padding: 0;
-		margin: 0;
+	/* ── iPhone setup ── */
+	.iphone-setup-block {
 		display: flex;
 		flex-direction: column;
+		gap: 1rem;
+		padding: 1.25rem;
+		border-radius: var(--radius-xl);
+		background: linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.03));
+		backdrop-filter: blur(20px);
+		border: 1px solid var(--border);
+	}
+
+	.setup-head {
+		display: flex;
+		justify-content: space-between;
+		align-items: flex-start;
+		gap: 1rem;
+	}
+
+	.setup-kicker {
+		font-size: 0.72rem;
+		font-weight: 700;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		color: var(--accent);
+		margin-bottom: 0.2rem;
+	}
+
+	.setup-head h2 {
+		font-size: 1.15rem;
+		line-height: 1.2;
+	}
+
+	.setup-dots {
+		display: flex;
+		gap: 0.35rem;
+		padding-top: 0.15rem;
+	}
+
+	.setup-dots span {
+		width: 8px;
+		height: 8px;
+		border-radius: 999px;
+		background: rgba(255, 255, 255, 0.12);
+	}
+
+	.setup-dots span.active {
+		background: var(--accent);
+		box-shadow: 0 0 10px var(--accent-glow);
+	}
+
+	.setup-text,
+	.setup-note {
+		font-size: 0.86rem;
+		line-height: 1.5;
+		color: var(--text-muted);
+	}
+
+	.setup-app-grid {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
 		gap: 0.6rem;
 	}
-	.install-steps li {
-		display: flex;
-		align-items: center;
-		gap: 0.55rem;
-		font-size: 0.88rem;
-		line-height: 1.4;
+
+	.setup-app-grid button {
+		padding: 0.9rem 1rem;
+		border-radius: var(--radius-md);
+		border: 1px solid var(--border);
+		background: var(--field);
+		color: var(--text-dim);
+		font: inherit;
+		font-size: 0.9rem;
+		font-weight: 600;
+		cursor: pointer;
+		transition: border-color 0.18s, background 0.18s, color 0.18s, transform 0.12s;
 	}
+
+	.setup-app-grid button.selected {
+		background: var(--accent-dim);
+		border-color: rgba(249, 115, 22, 0.35);
+		color: var(--text);
+	}
+
+	.setup-app-grid button:active {
+		transform: scale(0.98);
+	}
+
+	.setup-steps {
+		display: flex;
+		flex-direction: column;
+		gap: 0.65rem;
+	}
+
+	.setup-step {
+		display: flex;
+		align-items: flex-start;
+		gap: 0.65rem;
+		font-size: 0.88rem;
+		line-height: 1.45;
+		color: var(--text);
+	}
+
+	.setup-selected {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.55rem;
+	}
+
+	.setup-selected span {
+		padding: 0.45rem 0.8rem;
+		border-radius: 999px;
+		background: var(--field);
+		border: 1px solid var(--border);
+		color: var(--text);
+		font-size: 0.82rem;
+		font-weight: 600;
+	}
+
+	.setup-nav {
+		display: flex;
+		justify-content: flex-end;
+		gap: 0.65rem;
+		flex-wrap: wrap;
+	}
+
 	.step-num {
 		flex-shrink: 0;
 		width: 22px;
@@ -1112,34 +1264,6 @@
 		border: 1px solid var(--border);
 		font-size: 0.82rem;
 		color: var(--text);
-	}
-	.share-ico {
-		font-size: 0.9rem;
-		transform: translateY(-1px);
-	}
-
-	/* ── Reach ── */
-	.reach-block {
-		display: flex;
-		flex-direction: column;
-		gap: 0.7rem;
-		padding: 1.25rem;
-		border-radius: var(--radius-xl);
-		background: var(--bg-card);
-		backdrop-filter: blur(20px);
-		border: 1px solid var(--border);
-	}
-	.reach-title {
-		font-size: 0.72rem;
-		font-weight: 600;
-		color: var(--text-muted);
-		text-transform: uppercase;
-		letter-spacing: 0.08em;
-	}
-	.reach-hint {
-		font-size: 0.82rem;
-		color: var(--text-muted);
-		line-height: 1.5;
 	}
 	.reach-btn {
 		padding: 0.9rem 1rem;
@@ -1400,8 +1524,7 @@
 
 		.microstep-block,
 		.checklist,
-		.install-block,
-		.reach-block,
+		.iphone-setup-block,
 		.rewards.locked-section {
 			grid-column: 2;
 		}
@@ -1417,8 +1540,7 @@
 		.settings-panel,
 		.sleep-counter,
 		.progress-block,
-		.install-block,
-		.reach-block,
+		.iphone-setup-block,
 		.rewards.locked-section,
 		.checklist {
 			background: var(--bg-card);
@@ -1444,8 +1566,7 @@
 			font-size: 1rem;
 		}
 
-		.install-block,
-		.reach-block,
+		.iphone-setup-block,
 		.rewards.locked-section {
 			padding: 1.35rem;
 		}
