@@ -1169,6 +1169,113 @@
 		color: var(--text);
 	}
 
+	@media (min-width: 980px) {
+		.page {
+			max-width: 1180px;
+			padding: 3.25rem 2.5rem 5.5rem;
+			column-gap: 2rem;
+			row-gap: 1.5rem;
+			display: grid;
+			grid-template-columns: minmax(320px, 420px) minmax(460px, 1fr);
+			align-content: start;
+			align-items: start;
+		}
+
+		.idle-top,
+		.settings-panel,
+		.sleep-counter,
+		.progress-block {
+			grid-column: 1;
+		}
+
+		.checklist,
+		.install-block,
+		.reach-block,
+		.rewards.locked-section {
+			grid-column: 2;
+		}
+
+		.idle-top {
+			padding-top: 0.35rem;
+		}
+
+		.idle-clock {
+			font-size: 2.4rem;
+		}
+
+		.settings-panel,
+		.sleep-counter,
+		.progress-block,
+		.install-block,
+		.reach-block,
+		.rewards.locked-section,
+		.checklist {
+			background: var(--bg-card);
+			border: 1px solid var(--border);
+			border-radius: var(--radius-xl);
+			backdrop-filter: blur(20px);
+			box-shadow: 0 24px 80px rgba(0, 0, 0, 0.22);
+		}
+
+		.progress-block {
+			padding: 1.75rem 1.25rem;
+		}
+
+		.checklist {
+			padding: 1.1rem;
+			gap: 0.7rem;
+			position: sticky;
+			top: 2rem;
+		}
+
+		.check-item {
+			padding: 1.15rem 1.25rem;
+			font-size: 1rem;
+		}
+
+		.install-block,
+		.reach-block,
+		.rewards.locked-section {
+			padding: 1.35rem;
+		}
+
+		.rewards.locked-section .reward-grid,
+		.page > .rewards:not(.locked-section) .reward-grid {
+			grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+		}
+
+		.page > .done-top,
+		.page > .rewards:not(.locked-section),
+		.page > .back-btn {
+			grid-column: 1 / -1;
+			max-width: 760px;
+			width: 100%;
+			margin-left: auto;
+			margin-right: auto;
+		}
+
+		.page > .rewards:not(.locked-section) {
+			padding: 0 1rem;
+		}
+
+		.done-top {
+			padding: 6rem 0 1.5rem;
+		}
+
+		.done-clock {
+			font-size: 5.25rem;
+		}
+
+		.back-btn {
+			margin-top: 1rem;
+		}
+
+		.help-dock {
+			left: 1.5rem;
+			bottom: 1.5rem;
+		}
+	}
+
 	@media (max-width: 640px) {
 		.help-dock {
 			left: 0.75rem;
