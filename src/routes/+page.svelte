@@ -16,7 +16,7 @@
 		getIntensityLevel,
 		formatTime
 	} from '$lib/modules/iltavahti/time-engine';
-	import { downloadIcs } from '$lib/modules/iltavahti/ical';
+	import { downloadIcs, downloadSingleEventIcs } from '$lib/modules/iltavahti/ical';
 	import { saveSettings } from '$lib/core/storage';
 	import {
 		subscribeToPush,
@@ -31,11 +31,21 @@
 	import type { IntensityLevel } from '$lib/core/events';
 
 	type SetupStep = 1 | 2 | 3;
+	type PlannedCalendarEntry = {
+		id: string;
+		title: string;
+		date: string;
+		time: string | null;
+		durationMinutes: number;
+		raw: string;
+		createdAt: number;
+	};
 
 	const PUSH_BACKEND_URL = import.meta.env.VITE_PUSH_BACKEND_URL as string | undefined;
 	const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY as string | undefined;
 	const pushConfigured = !!(PUSH_BACKEND_URL && VAPID_PUBLIC_KEY);
 	const IPHONE_SETUP_KEY = 'concentra-iphone-setup-v1';
+	const CALENDAR_ENTRIES_KEY = 'concentra-calendar-entries-v1';
 	const distractionOptions = ['TikTok', 'Instagram', 'Reddit', 'YouTube', 'Safari', 'X'];
 	// --- State ---
 	let now = new Date();
@@ -51,6 +61,11 @@
 	let iphoneSetupDone = false;
 	let editingIphoneSetup = false;
 	let setupHydrated = false;
+	let calendarHydrated = false;
+	let quickCalendarInput = '';
+	let quickCalendarError = '';
+	let quickCalendarSuccess = '';
+	let calendarEntries: PlannedCalendarEntry[] = [];
 
 	let level: IntensityLevel = 'calm';
 
@@ -133,9 +148,32 @@
 			// ignore broken local state
 		}
 
+		try {
+			const rawEntries = localStorage.getItem(CALENDAR_ENTRIES_KEY);
+			if (rawEntries) {
+				const savedEntries = JSON.parse(rawEntries) as PlannedCalendarEntry[];
+				if (Array.isArray(savedEntries)) {
+					calendarEntries = savedEntries.filter((entry) =>
+						entry &&
+						typeof entry === 'object' &&
+						typeof entry.id === 'string' &&
+						typeof entry.title === 'string' &&
+						typeof entry.date === 'string' &&
+						(typeof entry.time === 'string' || entry.time === null) &&
+						typeof entry.durationMinutes === 'number' &&
+						typeof entry.raw === 'string' &&
+						typeof entry.createdAt === 'number'
+					);
+				}
+			}
+		} catch {
+			// ignore broken local state
+		}
+
 		const state = await getSubscriptionState();
 		pushSubscribed = state.subscribed;
 		setupHydrated = true;
+		calendarHydrated = true;
 	});
 
 	$: if (browser && setupHydrated) {
@@ -147,6 +185,10 @@
 				iphoneSetupDone
 			})
 		);
+	}
+
+	$: if (browser && calendarHydrated) {
+		localStorage.setItem(CALENDAR_ENTRIES_KEY, JSON.stringify(calendarEntries));
 	}
 
 	async function togglePushSubscription() {
@@ -213,6 +255,11 @@
 	$: hiddenCount = criticalOnly ? state.tasks.length - visibleTasks.length : 0;
 	$: remaining = visibleTasks.filter((t) => !t.done);
 	$: allDone = visibleTasks.length > 0 && remaining.length === 0;
+	$: sortedCalendarEntries = [...calendarEntries].sort((a, b) => {
+		const left = `${a.date}T${a.time ?? '23:59'}`;
+		const right = `${b.date}T${b.time ?? '23:59'}`;
+		return left.localeCompare(right);
+	});
 
 	// Switch to done mode when all visible tasks completed
 	$: if (allDone && mode === 'idle' && !todayDone) {
@@ -246,6 +293,61 @@
 		{ label: 'Reddit', url: 'https://reddit.com' },
 		{ label: 'X', url: 'https://x.com' }
 	];
+
+	// --- Spotify soundscapes ---
+	const SPOTIFY_KEY = 'concentra-spotify-v1';
+	const defaultPlaylists = [
+		{ label: 'ADHD Unimusiikki', id: '3AQjqe3GLROVtW8xssG0oK' },
+		{ label: 'Valkoinen kohina', id: '7D4g8rEVa6DjVfpMm5ztZK' },
+		{ label: 'Syvä uni', id: '2fO8tqzaPUEUtaICpqi3Th' },
+		{ label: 'Rauhoittava 432 Hz', id: '2CNX0SyrIjpxjJw5HIae4Z' },
+	];
+	let activePlaylist: string | null = null;
+	let customSpotifyUrl = '';
+	let savedCustomUrl = '';
+	let showCustomInput = false;
+
+	onMount(() => {
+		try {
+			const raw = localStorage.getItem(SPOTIFY_KEY);
+			if (raw) {
+				const saved = JSON.parse(raw);
+				if (typeof saved.customUrl === 'string') {
+					savedCustomUrl = saved.customUrl;
+					customSpotifyUrl = saved.customUrl;
+				}
+			}
+		} catch { /* ignore */ }
+	});
+
+	function getSpotifyEmbedUrl(playlistId: string): string {
+		return `https://open.spotify.com/embed/playlist/${playlistId}?utm_source=generator&theme=0`;
+	}
+
+	function getCustomEmbedUrl(url: string): string | null {
+		// Extract playlist/track/album ID from Spotify URL
+		const match = url.match(/open\.spotify\.com\/(playlist|track|album)\/([a-zA-Z0-9]+)/);
+		if (match) {
+			return `https://open.spotify.com/embed/${match[1]}/${match[2]}?utm_source=generator&theme=0`;
+		}
+		return null;
+	}
+
+	function selectPlaylist(id: string) {
+		activePlaylist = activePlaylist === id ? null : id;
+	}
+
+	function saveCustomPlaylist() {
+		const embedUrl = getCustomEmbedUrl(customSpotifyUrl);
+		if (embedUrl) {
+			savedCustomUrl = customSpotifyUrl;
+			activePlaylist = 'custom';
+			showCustomInput = false;
+			try {
+				localStorage.setItem(SPOTIFY_KEY, JSON.stringify({ customUrl: savedCustomUrl }));
+			} catch { /* quota */ }
+		}
+	}
 
 	function backToIdle() {
 		mode = 'idle';
@@ -286,6 +388,109 @@
 		iphoneSetupDone = false;
 		setupStep = 1;
 	}
+
+	function pad2(value: number): string {
+		return value.toString().padStart(2, '0');
+	}
+
+	function parseQuickCalendarEntry(raw: string): Omit<PlannedCalendarEntry, 'id' | 'createdAt'> {
+		const trimmed = raw.trim().replace(/\s+/g, ' ');
+		const match = trimmed.match(/^(\d{1,2})[.,/](\d{1,2})(?:[.,/](\d{2,4}))?\s+(.+)$/);
+		if (!match) {
+			throw new Error('Kirjoita muodossa esim. 27.5 terapia 14:00');
+		}
+
+		const day = Number(match[1]);
+		const month = Number(match[2]);
+		const yearPart = match[3];
+		let titlePart = match[4].trim();
+		const timeMatch = titlePart.match(/\b(\d{1,2})[:.](\d{2})\b/);
+		let time: string | null = null;
+
+		if (timeMatch) {
+			const hours = Number(timeMatch[1]);
+			const minutes = Number(timeMatch[2]);
+			if (hours > 23 || minutes > 59) {
+				throw new Error('Kellonaika ei näytä oikealta');
+			}
+			time = `${pad2(hours)}:${pad2(minutes)}`;
+			titlePart = titlePart.replace(timeMatch[0], '').replace(/\s+/g, ' ').trim();
+		}
+
+		if (!titlePart) {
+			throw new Error('Kirjoita päivämäärän jälkeen myös asian nimi');
+		}
+
+		let year = new Date().getFullYear();
+		if (yearPart) {
+			year = yearPart.length === 2 ? Number(`20${yearPart}`) : Number(yearPart);
+		}
+
+		const candidate = new Date(year, month - 1, day);
+		if (
+			candidate.getFullYear() !== year ||
+			candidate.getMonth() !== month - 1 ||
+			candidate.getDate() !== day
+		) {
+			throw new Error('Päivämäärä ei näytä oikealta');
+		}
+
+		if (!yearPart) {
+			const today = new Date();
+			today.setHours(0, 0, 0, 0);
+			if (candidate < today) {
+				candidate.setFullYear(candidate.getFullYear() + 1);
+			}
+		}
+
+		return {
+			title: titlePart,
+			date: `${candidate.getFullYear()}-${pad2(candidate.getMonth() + 1)}-${pad2(candidate.getDate())}`,
+			time,
+			durationMinutes: 60,
+			raw: trimmed
+		};
+	}
+
+	function formatCalendarEntry(entry: PlannedCalendarEntry): string {
+		const [year, month, day] = entry.date.split('-').map(Number);
+		const date = new Date(year, month - 1, day);
+		const dateLabel = date.toLocaleDateString('fi-FI', { day: 'numeric', month: 'numeric' });
+		return entry.time ? `${dateLabel} klo ${entry.time}` : dateLabel;
+	}
+
+	function createCalendarEntry() {
+		if (!browser) return;
+		quickCalendarError = '';
+		quickCalendarSuccess = '';
+		try {
+			const parsed = parseQuickCalendarEntry(quickCalendarInput);
+			const entry: PlannedCalendarEntry = {
+				id: browser && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
+				createdAt: Date.now(),
+				...parsed
+			};
+			calendarEntries = [entry, ...calendarEntries];
+			const appUrl = window.location.origin + base + '/';
+			downloadSingleEventIcs(entry, appUrl);
+			quickCalendarInput = '';
+			quickCalendarSuccess = 'Kalenterimerkintä luotu. Hyväksy se kalenterissa.';
+		} catch (error) {
+			quickCalendarError = error instanceof Error ? error.message : 'Merkintää ei voitu lukea';
+		}
+	}
+
+	function redownloadCalendarEntry(entry: PlannedCalendarEntry) {
+		if (!browser) return;
+		const appUrl = window.location.origin + base + '/';
+		downloadSingleEventIcs(entry, appUrl);
+		quickCalendarSuccess = 'Kalenterimerkintä avattu uudelleen.';
+		quickCalendarError = '';
+	}
+
+	function removeCalendarEntry(id: string) {
+		calendarEntries = calendarEntries.filter((entry) => entry.id !== id);
+	}
 </script>
 
 <svelte:head>
@@ -301,6 +506,87 @@
 
 			{#if totalDays > 0}
 				<div class="total-badge">{totalDays} {totalDays === 1 ? 'ilta' : 'iltaa'} hoidettu</div>
+			{/if}
+		</div>
+
+		<div class="soundscape-block">
+			<p class="soundscape-kicker">Rauhoitu</p>
+			<h2 class="soundscape-title">Valitse iltaääni</h2>
+			<p class="soundscape-desc">Musiikki tai kohina auttaa ADHD-aivoja rauhoittumaan. Paina ja kuuntele.</p>
+
+			<div class="soundscape-grid">
+				{#each defaultPlaylists as pl}
+					<button
+						class="soundscape-btn"
+						class:active={activePlaylist === pl.id}
+						onclick={() => selectPlaylist(pl.id)}
+					>
+						{pl.label}
+					</button>
+				{/each}
+				<button
+					class="soundscape-btn"
+					class:active={activePlaylist === 'custom'}
+					onclick={() => {
+						if (savedCustomUrl) {
+							selectPlaylist('custom');
+						} else {
+							showCustomInput = !showCustomInput;
+						}
+					}}
+				>
+					{savedCustomUrl ? 'Oma lista' : '+ Oma linkki'}
+				</button>
+			</div>
+
+			{#if showCustomInput || (activePlaylist === 'custom' && !savedCustomUrl)}
+				<div class="custom-input-row">
+					<input
+						type="url"
+						class="custom-input"
+						placeholder="open.spotify.com/playlist/..."
+						bind:value={customSpotifyUrl}
+						onkeydown={(e) => { if (e.key === 'Enter') saveCustomPlaylist(); }}
+					/>
+					<button class="custom-save-btn" onclick={saveCustomPlaylist}>Tallenna</button>
+				</div>
+			{/if}
+
+			{#if activePlaylist && activePlaylist !== 'custom'}
+				<div class="spotify-embed">
+					<iframe
+						title="Spotify"
+						src={getSpotifyEmbedUrl(activePlaylist)}
+						width="100%"
+						height="152"
+						frameborder="0"
+						allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+						loading="lazy"
+						style="border-radius: 12px;"
+					></iframe>
+				</div>
+			{:else if activePlaylist === 'custom' && savedCustomUrl}
+				{@const embedUrl = getCustomEmbedUrl(savedCustomUrl)}
+				{#if embedUrl}
+					<div class="spotify-embed">
+						<iframe
+							title="Spotify"
+							src={embedUrl}
+							width="100%"
+							height="152"
+							frameborder="0"
+							allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+							loading="lazy"
+							style="border-radius: 12px;"
+						></iframe>
+					</div>
+				{/if}
+			{/if}
+
+			{#if savedCustomUrl && activePlaylist !== 'custom'}
+				<button class="soundscape-edit" onclick={() => { showCustomInput = true; activePlaylist = 'custom'; }}>
+					Muokkaa omaa linkkiä
+				</button>
 			{/if}
 		</div>
 
@@ -575,6 +861,65 @@
 				{/if}
 			</div>
 		{/if}
+
+		<div class="calendar-capture-block">
+			<div class="calendar-head">
+				<div>
+					<p class="calendar-kicker">Kalenteri</p>
+					<h2>Kirjoita merkintä nopeasti</h2>
+				</div>
+				<p class="calendar-helper">Esim. `27.5 terapia 14:00` tai `28.5 laskun eräpäivä`</p>
+			</div>
+
+			<div class="calendar-compose">
+				<input
+					class="calendar-input"
+					type="text"
+					bind:value={quickCalendarInput}
+					placeholder="27.5 terapia 14:00"
+					onkeydown={(event) => {
+						if (event.key === 'Enter') {
+							event.preventDefault();
+							createCalendarEntry();
+						}
+					}}
+				/>
+				<button class="reach-btn" type="button" onclick={createCalendarEntry}>
+					Lisää kalenteriin
+				</button>
+			</div>
+
+			<p class="calendar-note">
+				Concentra tekee kalenterimerkinnän valmiiksi. Hyväksyt sen kerran, ja se menee puhelimen kalenteriin.
+			</p>
+
+			{#if quickCalendarError}
+				<p class="reach-warn">{quickCalendarError}</p>
+			{:else if quickCalendarSuccess}
+				<p class="calendar-success">{quickCalendarSuccess}</p>
+			{/if}
+
+			{#if sortedCalendarEntries.length > 0}
+				<div class="calendar-list">
+					{#each sortedCalendarEntries as entry}
+						<div class="calendar-item">
+							<div class="calendar-item-copy">
+								<strong>{entry.title}</strong>
+								<span>{formatCalendarEntry(entry)}</span>
+							</div>
+							<div class="calendar-item-actions">
+								<button class="reach-btn secondary" type="button" onclick={() => redownloadCalendarEntry(entry)}>
+									Avaa uudelleen
+								</button>
+								<button class="reach-btn secondary calendar-delete" type="button" onclick={() => removeCalendarEntry(entry.id)}>
+									Poista
+								</button>
+							</div>
+						</div>
+					{/each}
+				</div>
+			{/if}
+		</div>
 
 		<div class="rewards locked-section">
 			<p class="rewards-hint">Tee ensin iltatoimet.</p>
@@ -1264,6 +1609,104 @@
 		color: var(--danger);
 	}
 
+	.calendar-capture-block {
+		display: flex;
+		flex-direction: column;
+		gap: 0.95rem;
+		padding: 1.25rem;
+		border-radius: var(--radius-xl);
+		background: linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.03));
+		backdrop-filter: blur(20px);
+		border: 1px solid var(--border);
+	}
+
+	.calendar-head {
+		display: flex;
+		flex-direction: column;
+		gap: 0.4rem;
+	}
+
+	.calendar-kicker {
+		font-size: 0.72rem;
+		font-weight: 700;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		color: var(--accent);
+	}
+
+	.calendar-head h2 {
+		font-size: 1.1rem;
+		line-height: 1.2;
+	}
+
+	.calendar-helper,
+	.calendar-note,
+	.calendar-item-copy span,
+	.calendar-success {
+		font-size: 0.84rem;
+		line-height: 1.45;
+		color: var(--text-muted);
+	}
+
+	.calendar-compose {
+		display: flex;
+		flex-direction: column;
+		gap: 0.75rem;
+	}
+
+	.calendar-input {
+		width: 100%;
+		padding: 0.95rem 1rem;
+		border-radius: var(--radius-md);
+		border: 1px solid var(--border);
+		background: var(--field);
+		color: var(--text);
+		font: inherit;
+		font-size: 0.95rem;
+	}
+
+	.calendar-input:focus {
+		outline: none;
+		border-color: var(--border-focus);
+	}
+
+	.calendar-list {
+		display: flex;
+		flex-direction: column;
+		gap: 0.7rem;
+	}
+
+	.calendar-item {
+		display: flex;
+		flex-direction: column;
+		gap: 0.8rem;
+		padding: 0.95rem 1rem;
+		border-radius: var(--radius-md);
+		background: var(--field);
+		border: 1px solid var(--border);
+	}
+
+	.calendar-item-copy {
+		display: flex;
+		flex-direction: column;
+		gap: 0.2rem;
+	}
+
+	.calendar-item-copy strong {
+		font-size: 0.95rem;
+		color: var(--text);
+	}
+
+	.calendar-item-actions {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.6rem;
+	}
+
+	.calendar-delete {
+		color: var(--text-muted);
+	}
+
 	/* ── Rewards ── */
 	.rewards-hint {
 		font-size: 0.78rem;
@@ -1301,6 +1744,128 @@
 	.reward.locked {
 		color: var(--text-muted);
 		opacity: 0.25;
+	}
+
+	/* ── Soundscape / Spotify ── */
+	.soundscape-block {
+		display: flex;
+		flex-direction: column;
+		gap: 0.85rem;
+		padding: 1.25rem;
+		border-radius: var(--radius-xl);
+		background: linear-gradient(180deg, rgba(30, 215, 96, 0.06), rgba(30, 215, 96, 0.02));
+		backdrop-filter: blur(20px);
+		border: 1px solid rgba(30, 215, 96, 0.15);
+	}
+
+	.soundscape-kicker {
+		font-size: 0.72rem;
+		font-weight: 700;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		color: #1ed760;
+	}
+
+	.soundscape-title {
+		font-size: 1.15rem;
+		line-height: 1.2;
+	}
+
+	.soundscape-desc {
+		font-size: 0.84rem;
+		line-height: 1.45;
+		color: var(--text-muted);
+	}
+
+	.soundscape-grid {
+		display: grid;
+		grid-template-columns: repeat(2, 1fr);
+		gap: 0.5rem;
+	}
+
+	.soundscape-btn {
+		padding: 0.85rem 0.75rem;
+		border-radius: var(--radius-md);
+		border: 1px solid var(--border);
+		background: var(--field);
+		color: var(--text-dim);
+		font: inherit;
+		font-size: 0.84rem;
+		font-weight: 500;
+		cursor: pointer;
+		transition: border-color 0.18s, background 0.18s, color 0.18s, transform 0.12s;
+		text-align: center;
+	}
+
+	.soundscape-btn.active {
+		background: rgba(30, 215, 96, 0.12);
+		border-color: rgba(30, 215, 96, 0.35);
+		color: #1ed760;
+		font-weight: 600;
+	}
+
+	.soundscape-btn:active {
+		transform: scale(0.97);
+	}
+
+	.spotify-embed {
+		animation: fadeIn 0.3s ease;
+	}
+
+	.custom-input-row {
+		display: flex;
+		gap: 0.5rem;
+	}
+
+	.custom-input {
+		flex: 1;
+		padding: 0.7rem 0.85rem;
+		border-radius: var(--radius-sm);
+		border: 1px solid var(--border);
+		background: var(--field);
+		color: var(--text);
+		font: inherit;
+		font-size: 0.84rem;
+	}
+
+	.custom-input:focus {
+		outline: none;
+		border-color: #1ed760;
+	}
+
+	.custom-input::placeholder {
+		color: var(--text-muted);
+	}
+
+	.custom-save-btn {
+		padding: 0.7rem 1rem;
+		border-radius: var(--radius-sm);
+		border: none;
+		background: #1ed760;
+		color: #000;
+		font: inherit;
+		font-size: 0.84rem;
+		font-weight: 600;
+		cursor: pointer;
+		white-space: nowrap;
+	}
+
+	.custom-save-btn:active {
+		opacity: 0.85;
+	}
+
+	.soundscape-edit {
+		background: none;
+		border: none;
+		color: var(--text-muted);
+		font-size: 0.78rem;
+		cursor: pointer;
+		text-align: center;
+		padding: 0.3rem;
+	}
+
+	.soundscape-edit:active {
+		color: var(--text);
 	}
 
 	/* ── Done view ── */
@@ -1491,6 +2056,7 @@
 		.idle-top,
 		.settings-panel,
 		.iphone-setup-block,
+		.calendar-capture-block,
 		.rewards.locked-section {
 			grid-column: 1 / -1;
 		}
@@ -1520,6 +2086,7 @@
 		.sleep-counter,
 		.progress-block,
 		.iphone-setup-block,
+		.calendar-capture-block,
 		.rewards.locked-section,
 		.checklist {
 			background: var(--bg-card);
@@ -1550,6 +2117,7 @@
 		}
 
 		.iphone-setup-block,
+		.calendar-capture-block,
 		.rewards.locked-section {
 			padding: 1.45rem;
 		}
@@ -1616,6 +2184,35 @@
 			grid-column: 1;
 		}
 
+		.calendar-capture-block {
+			display: grid;
+			grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
+			column-gap: 1.2rem;
+			align-items: start;
+		}
+
+		.calendar-capture-block .calendar-head,
+		.calendar-capture-block .calendar-compose,
+		.calendar-capture-block .calendar-note,
+		.calendar-capture-block .reach-warn,
+		.calendar-capture-block .calendar-success {
+			grid-column: 1;
+		}
+
+		.calendar-capture-block .calendar-list {
+			grid-column: 2;
+			grid-row: 1 / span 5;
+		}
+
+		.calendar-capture-block .calendar-compose {
+			flex-direction: row;
+			align-items: stretch;
+		}
+
+		.calendar-capture-block .calendar-compose .reach-btn {
+			flex: 0 0 210px;
+		}
+		
 		.rewards.locked-section .reward-grid,
 		.page > .rewards:not(.locked-section) .reward-grid {
 			grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
@@ -1654,6 +2251,10 @@
 	}
 
 	@media (max-width: 640px) {
+		.calendar-item-actions {
+			flex-direction: column;
+		}
+
 		.help-dock {
 			left: 0.75rem;
 			right: 0.75rem;

@@ -1,5 +1,13 @@
 import type { UserSettings } from '$lib/core/state';
 
+export interface CalendarEventDraft {
+	title: string;
+	date: string; // YYYY-MM-DD
+	time?: string | null; // HH:MM
+	durationMinutes?: number;
+	description?: string;
+}
+
 interface ReminderTemplate {
 	uid: string;
 	summary: string;
@@ -60,6 +68,16 @@ function escapeIcs(text: string): string {
 		.replace(/;/g, '\\;');
 }
 
+function toDateParts(date: string): { year: number; month: number; day: number } {
+	const [year, month, day] = date.split('-').map(Number);
+	return { year, month, day };
+}
+
+function formatDateValue(date: string): string {
+	const { year, month, day } = toDateParts(date);
+	return `${year}${pad(month)}${pad(day)}`;
+}
+
 function bedtimeMinutes(settings: UserSettings): number {
 	const [wh, wm] = settings.wakeUpTime.split(':').map(Number);
 	const total = wh * 60 + wm - settings.sleepHours * 60;
@@ -113,6 +131,63 @@ export function generateIcs(settings: UserSettings, appUrl: string): string {
 	return lines.join('\r\n') + '\r\n';
 }
 
+export function generateSingleEventIcs(event: CalendarEventDraft, appUrl: string): string {
+	const now = new Date();
+	const dtStamp = formatUtc(now);
+	const durationMinutes = event.durationMinutes ?? 60;
+	const lines: string[] = [
+		'BEGIN:VCALENDAR',
+		'VERSION:2.0',
+		'PRODID:-//Concentra//Concentra Calendar Event//FI',
+		'CALSCALE:GREGORIAN',
+		'METHOD:PUBLISH',
+		'BEGIN:VEVENT',
+		`UID:concentra-event-${Date.now()}@iltavahti.local`,
+		`DTSTAMP:${dtStamp}`
+	];
+
+	if (event.time) {
+		const [hours, minutes] = event.time.split(':').map(Number);
+		const { year, month, day } = toDateParts(event.date);
+		const start = new Date(year, month - 1, day, hours, minutes, 0, 0);
+		const end = new Date(start.getTime() + durationMinutes * 60 * 1000);
+		lines.push(
+			`DTSTART:${formatLocal(start)}`,
+			`DTEND:${formatLocal(end)}`
+		);
+	} else {
+		const startDate = formatDateValue(event.date);
+		const nextDay = new Date(`${event.date}T00:00:00`);
+		nextDay.setDate(nextDay.getDate() + 1);
+		const endDate = formatDateValue(
+			`${nextDay.getFullYear()}-${pad(nextDay.getMonth() + 1)}-${pad(nextDay.getDate())}`
+		);
+		lines.push(
+			`DTSTART;VALUE=DATE:${startDate}`,
+			`DTEND;VALUE=DATE:${endDate}`
+		);
+	}
+
+	lines.push(
+		`SUMMARY:${escapeIcs(event.title)}`,
+		`DESCRIPTION:${escapeIcs(event.description ?? `Luotu Concentra-sivulta\n${appUrl}`)}`,
+		`URL:${escapeIcs(appUrl)}`
+	);
+
+	if (event.time) {
+		lines.push(
+			'BEGIN:VALARM',
+			'ACTION:DISPLAY',
+			`DESCRIPTION:${escapeIcs(event.title)}`,
+			'TRIGGER:-PT30M',
+			'END:VALARM'
+		);
+	}
+
+	lines.push('END:VEVENT', 'END:VCALENDAR');
+	return lines.join('\r\n') + '\r\n';
+}
+
 export function downloadIcs(settings: UserSettings, appUrl: string): void {
 	const ics = generateIcs(settings, appUrl);
 	const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
@@ -120,6 +195,19 @@ export function downloadIcs(settings: UserSettings, appUrl: string): void {
 	const link = document.createElement('a');
 	link.href = url;
 	link.download = 'concentra.ics';
+	document.body.appendChild(link);
+	link.click();
+	document.body.removeChild(link);
+	setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+export function downloadSingleEventIcs(event: CalendarEventDraft, appUrl: string): void {
+	const ics = generateSingleEventIcs(event, appUrl);
+	const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
+	const url = URL.createObjectURL(blob);
+	const link = document.createElement('a');
+	link.href = url;
+	link.download = `${event.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'concentra-event'}.ics`;
 	document.body.appendChild(link);
 	link.click();
 	document.body.removeChild(link);
