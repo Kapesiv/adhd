@@ -1,6 +1,24 @@
-const CACHE_NAME = 'adhd-app-v1';
+const CACHE_NAME = 'concentra-static-v2';
 const CONFIG_DB = 'iltavahti-sw';
 const CONFIG_STORE = 'config';
+
+function shouldCache(request, response) {
+	if (!response || response.status !== 200) return false;
+
+	const url = new URL(request.url);
+	if (url.origin !== self.location.origin) return false;
+	if (request.mode === 'navigate') return false;
+
+	return (
+		url.pathname.includes('/_app/immutable/') ||
+		url.pathname.endsWith('.css') ||
+		url.pathname.endsWith('.js') ||
+		url.pathname.endsWith('.png') ||
+		url.pathname.endsWith('.svg') ||
+		url.pathname.endsWith('.woff2') ||
+		url.pathname.endsWith('manifest.json')
+	);
+}
 
 function openConfigDB() {
 	return new Promise((resolve, reject) => {
@@ -60,11 +78,17 @@ self.addEventListener('fetch', (event) => {
 	event.respondWith(
 		fetch(event.request)
 			.then((response) => {
-				const clone = response.clone();
-				caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+				if (shouldCache(event.request, response)) {
+					const clone = response.clone();
+					caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+				}
 				return response;
 			})
-			.catch(() => caches.match(event.request))
+			.catch(async () => {
+				const cached = await caches.match(event.request);
+				if (cached) return cached;
+				throw new Error(`Network failed for ${event.request.url}`);
+			})
 	);
 });
 
