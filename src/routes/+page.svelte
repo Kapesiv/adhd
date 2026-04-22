@@ -7,6 +7,7 @@
 		haptic
 	} from '$lib/iltavahti';
 	import { onMount, onDestroy } from 'svelte';
+	import { goto } from '$app/navigation';
 	import { settings, type UserSettings } from '$lib/core/state';
 	import {
 		calculateDeadline,
@@ -208,6 +209,10 @@
 			return next;
 		});
 	}
+
+	function openOnboarding() {
+		goto(`${base}/tervetuloa`);
+	}
 </script>
 
 <svelte:head>
@@ -283,6 +288,10 @@
 						<option value="hard">Kova</option>
 					</select>
 				</label>
+
+				<button class="onboarding-link" type="button" onclick={openOnboarding}>
+					Avaa aloitusohjeet uudelleen
+				</button>
 			</div>
 		{/if}
 
@@ -511,6 +520,25 @@
 		border-radius: var(--radius-xl);
 		padding: 1.25rem;
 		animation: slideDown 0.25s ease;
+	}
+
+	.onboarding-link {
+		width: 100%;
+		padding: 0.8rem 0.95rem;
+		border-radius: var(--radius-md);
+		border: 1px solid var(--border);
+		background: var(--field);
+		color: var(--text-dim);
+		font: inherit;
+		font-size: 0.88rem;
+		text-align: center;
+		cursor: pointer;
+		transition: border-color 0.2s, color 0.2s, background 0.2s;
+	}
+	.onboarding-link:active {
+		border-color: var(--accent);
+		color: var(--text);
+		background: var(--accent-dim);
 	}
 
 	@keyframes slideDown {
