@@ -1619,32 +1619,38 @@
 
 	@media (min-width: 980px) {
 		.page {
-			max-width: 1180px;
-			padding: 3.25rem 2.5rem 5.5rem;
-			column-gap: 2rem;
-			row-gap: 1.5rem;
+			max-width: 1280px;
+			padding: 3.25rem 2.75rem 5.5rem;
+			column-gap: 1.75rem;
+			row-gap: 1.75rem;
 			display: grid;
-			grid-template-columns: minmax(320px, 420px) minmax(460px, 1fr);
+			grid-template-columns: minmax(360px, 440px) minmax(520px, 1fr);
 			align-content: start;
 			align-items: start;
 		}
 
 		.idle-top,
 		.settings-panel,
+		.iphone-setup-block,
+		.rewards.locked-section {
+			grid-column: 1 / -1;
+		}
+
 		.sleep-counter,
-		.progress-block,
 		.mode-block {
 			grid-column: 1;
 		}
 
+		.progress-block,
 		.microstep-block,
-		.checklist,
-		.iphone-setup-block,
-		.rewards.locked-section {
+		.checklist {
 			grid-column: 2;
 		}
 
 		.idle-top {
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
 			padding-top: 0.35rem;
 		}
 
@@ -1667,6 +1673,10 @@
 
 		.progress-block {
 			padding: 1.75rem 1.25rem;
+			min-height: 100%;
+			display: flex;
+			flex-direction: column;
+			justify-content: center;
 		}
 
 		.checklist {
@@ -1683,12 +1693,74 @@
 
 		.iphone-setup-block,
 		.rewards.locked-section {
-			padding: 1.35rem;
+			padding: 1.45rem;
+		}
+
+		.iphone-setup-block {
+			display: grid;
+			grid-template-columns: minmax(0, 1.25fr) minmax(280px, 0.75fr);
+			column-gap: 1.2rem;
+			align-items: start;
+		}
+
+		.iphone-setup-block.setup-summary {
+			grid-template-columns: minmax(0, 1fr) minmax(260px, 320px);
+		}
+
+		.iphone-setup-block .setup-head,
+		.iphone-setup-block .setup-text,
+		.iphone-setup-block .setup-status {
+			grid-column: 1;
+		}
+
+		.iphone-setup-block .setup-app-grid,
+		.iphone-setup-block .setup-steps,
+		.iphone-setup-block .setup-note {
+			grid-column: 1 / -1;
+		}
+
+		.iphone-setup-block .setup-selected,
+		.iphone-setup-block .reach-btn.secondary,
+		.iphone-setup-block .reach-btn:not(.secondary),
+		.iphone-setup-block .reach-warn,
+		.iphone-setup-block .setup-nav {
+			grid-column: 2;
+		}
+
+		.iphone-setup-block .setup-app-grid {
+			grid-template-columns: repeat(3, minmax(0, 1fr));
+		}
+
+		.iphone-setup-block .setup-selected {
+			align-self: start;
+			justify-content: flex-start;
+			padding: 0.1rem 0 0;
+		}
+
+		.iphone-setup-block .setup-nav {
+			align-self: end;
+			justify-content: flex-end;
+		}
+
+		.iphone-setup-block .reach-btn,
+		.iphone-setup-block .reach-warn {
+			align-self: start;
+		}
+
+		.iphone-setup-block.setup-summary .setup-nav,
+		.iphone-setup-block.setup-summary .setup-selected,
+		.iphone-setup-block.setup-summary .setup-status {
+			grid-column: 2;
+		}
+
+		.iphone-setup-block.setup-summary .setup-text,
+		.iphone-setup-block.setup-summary .setup-head {
+			grid-column: 1;
 		}
 
 		.rewards.locked-section .reward-grid,
 		.page > .rewards:not(.locked-section) .reward-grid {
-			grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+			grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
 		}
 
 		.page > .done-top,
