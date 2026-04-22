@@ -30,7 +30,6 @@
 	import { browser } from '$app/environment';
 	import type { IntensityLevel } from '$lib/core/events';
 
-	type EveningMode = 'auto' | 'normal' | 'stuck' | 'emergency';
 	type SetupStep = 1 | 2 | 3;
 
 	const PUSH_BACKEND_URL = import.meta.env.VITE_PUSH_BACKEND_URL as string | undefined;
@@ -47,10 +46,7 @@
 
 	let mode: 'idle' | 'done' = 'idle';
 	let showAll = false;
-	let eveningMode: EveningMode = 'auto';
 	let setupStep: SetupStep = 1;
-	let stuckTaskId = '';
-	let stuckStepIndex = 0;
 	let distractionApps = ['TikTok', 'Instagram', 'Reddit'];
 	let iphoneSetupDone = false;
 	let editingIphoneSetup = false;
@@ -196,29 +192,6 @@
 		return messages[seed % messages.length];
 	}
 
-	function microStepsForTask(label: string): string[] {
-		const normalized = label.toLowerCase();
-		if (normalized.includes('hampaat')) {
-			return ['Nouse ylös', 'Kävele vessaan', 'Ota hammasharja käteen', 'Aloita vain 10 sekunniksi'];
-		}
-		if (normalized.includes('latur')) {
-			return ['Ota laturi käteen', 'Laita puhelin siihen kiinni', 'Jätä puhelin siihen'];
-		}
-		if (normalized.includes('vaatte')) {
-			return ['Avaa vaatekaappi', 'Ota huomisen vaatteet esiin', 'Laske ne valmiiksi näkyville'];
-		}
-		if (normalized.includes('vesi')) {
-			return ['Ota vesipullo käteen', 'Täytä se puolilleen', 'Vie se sängyn viereen'];
-		}
-		if (normalized.includes('ruudut') || normalized.includes('näyttö')) {
-			return ['Sulje yksi ylimääräinen välilehti tai appi', 'Lukitse yksi häiriö pois', 'Käännä katse pois ruudusta'];
-		}
-		if (normalized.includes('sänky')) {
-			return ['Nouse seisomaan', 'Kävele sängyn luo', 'Istu sängylle', 'Mene makuulle'];
-		}
-		return ['Nouse ylös', 'Aloita tästä yhdestä asiasta', 'Tee vain ensimmäinen pieni liike'];
-	}
-
 	function completeTask(taskId: string) {
 		haptic();
 		playTick();
@@ -230,42 +203,14 @@
 	}
 
 	$: dateSeed = new Date().getDate();
-	// Adaptiivinen: näytä taskit kellonajan mukaan
 	$: criticalOnly = hoursRemaining < 1;
-	$: recommendedMode = hoursRemaining <= 0.75
-		? 'emergency'
-		: hoursRemaining <= 1.75
-			? 'stuck'
-			: 'normal';
-	$: activeEveningMode = eveningMode === 'auto' ? recommendedMode : eveningMode;
-	$: baseVisibleTasks = showAll
+	$: visibleTasks = showAll
 		? state.tasks
 		: criticalOnly
 			? state.tasks.filter((t) => t.priority === 'critical')
 			: state.tasks;
-	$: stuckTargetTask = baseVisibleTasks.find((task) => !task.done) ?? null;
-	$: if (activeEveningMode !== 'stuck') {
-		stuckTaskId = '';
-		stuckStepIndex = 0;
-	} else if (!stuckTargetTask) {
-		stuckTaskId = '';
-		stuckStepIndex = 0;
-	} else if (stuckTaskId !== stuckTargetTask.id) {
-		stuckTaskId = stuckTargetTask.id;
-		stuckStepIndex = 0;
-	}
-	$: stuckSteps = stuckTargetTask ? microStepsForTask(stuckTargetTask.label) : [];
-	$: currentMicroStep = stuckSteps[stuckStepIndex] ?? null;
-	$: visibleTasks =
-		activeEveningMode === 'stuck'
-			? stuckTargetTask
-				? [stuckTargetTask]
-				: []
-			: activeEveningMode === 'emergency'
-				? state.tasks.filter((task) => task.priority === 'critical')
-				: baseVisibleTasks;
-	$: hiddenCount =
-		activeEveningMode === 'normal' ? state.tasks.length - visibleTasks.length : 0;
+	$: nextTask = visibleTasks.find((task) => !task.done) ?? null;
+	$: hiddenCount = criticalOnly ? state.tasks.length - visibleTasks.length : 0;
 	$: remaining = visibleTasks.filter((t) => !t.done);
 	$: allDone = visibleTasks.length > 0 && remaining.length === 0;
 
@@ -340,16 +285,6 @@
 		editingIphoneSetup = true;
 		iphoneSetupDone = false;
 		setupStep = 1;
-	}
-
-	function advanceStuckStep() {
-		if (!stuckTargetTask) return;
-		if (stuckStepIndex < stuckSteps.length - 1) {
-			stuckStepIndex += 1;
-			return;
-		}
-		completeTask(stuckTargetTask.id);
-		stuckStepIndex = 0;
 	}
 </script>
 
@@ -459,56 +394,28 @@
 			</div>
 		</div>
 
-		<div class="mode-block" data-mode={activeEveningMode}>
+		<div class="mode-block">
 			<div class="mode-copy">
-				<p class="mode-kicker">Iltatila</p>
-				<h2>
-					{#if activeEveningMode === 'stuck'}
-						Tehdään vain yksi pieni askel
-					{:else if activeEveningMode === 'emergency'}
-						Pelastetaan ilta minimitasolle
-					{:else}
-						Normaali ilta, rauhallinen eteneminen
-					{/if}
-				</h2>
+				<p class="mode-kicker">Illan paketti</p>
+				<h2>Tee yksi asia kerrallaan</h2>
 				<p class="mode-text">
-					{#if activeEveningMode === 'stuck'}
-						Jos et jaksa aloittaa, Concentra näyttää vain yhden liikkeen kerrallaan.
-					{:else if activeEveningMode === 'emergency'}
-						Tehdään tänään vain kriittiset asiat. Täydellinen ilta ei ole vaatimus.
+					{#if criticalOnly}
+						Myöhä on jo, joten keskity vain tärkeimpiin. Täydellinen ilta ei ole vaatimus.
 					{:else}
-						Tee ilta omassa tahdissa. Vaihda `Jumissa`-tilaan heti jos käynnistys ei lähde.
+						Kaikki apu on tässä samassa näkymässä. Sinun ei tarvitse valita mitään tilaa ennen aloittamista.
 					{/if}
 				</p>
-			</div>
-
-			<div class="mode-pills">
-				<button class:active={eveningMode === 'auto'} onclick={() => (eveningMode = 'auto')}>Auto</button>
-				<button class:active={eveningMode === 'normal'} onclick={() => (eveningMode = 'normal')}>Normaali</button>
-				<button class:active={eveningMode === 'stuck'} onclick={() => (eveningMode = 'stuck')}>Jumissa</button>
-				<button class:active={eveningMode === 'emergency'} onclick={() => (eveningMode = 'emergency')}>Hätätila</button>
+				{#if nextTask}
+					<p class="mode-text"><b>Aloita tästä:</b> {nextTask.label}</p>
+				{/if}
 			</div>
 		</div>
 
-		{#if activeEveningMode === 'stuck' && stuckTargetTask}
-			<div class="microstep-block">
-				<p class="microstep-kicker">Tee vain tämä nyt</p>
-				<h2>{currentMicroStep}</h2>
-				<p class="microstep-task">Kohde: {stuckTargetTask.label}</p>
-				<p class="microstep-progress">Askel {Math.min(stuckStepIndex + 1, stuckSteps.length)} / {stuckSteps.length}</p>
-				<button class="microstep-btn" onclick={advanceStuckStep}>
-					{stuckStepIndex < stuckSteps.length - 1 ? 'Tehty, seuraava pieni askel' : 'Tehty, merkitse päätehtävä valmiiksi'}
-				</button>
-			</div>
-		{/if}
-
 		<div class="checklist">
-			{#if activeEveningMode === 'emergency'}
-				<p class="checklist-hint">Nyt riittää minimi. Keskity vain näihin kriittisiin asioihin.</p>
-			{:else if activeEveningMode === 'stuck'}
-				<p class="checklist-hint">Koko lista piilotetaan pois tieltä. Riittää että teet tämän yhden asian.</p>
-			{:else if criticalOnly && !showAll}
+			{#if criticalOnly && !showAll}
 				<p class="checklist-hint">Myöhä jo — nämä riittää tänään.</p>
+			{:else}
+				<p class="checklist-hint">Paina tehtävä valmiiksi heti kun se on tehty.</p>
 			{/if}
 
 			{#each visibleTasks as task}
@@ -523,9 +430,9 @@
 				</button>
 			{/each}
 
-			{#if hiddenCount > 0 && activeEveningMode === 'normal'}
+			{#if hiddenCount > 0}
 				<button class="show-more-btn" onclick={() => showAll = !showAll}>
-					{showAll ? 'Näytä vain tärkeät' : `+${hiddenCount} muuta`}
+					{showAll ? 'Näytä vain tärkeät' : `Näytä myös loput (${hiddenCount})`}
 				</button>
 			{/if}
 		</div>
@@ -1021,9 +928,8 @@
 		font-weight: 700;
 	}
 
-	/* ── Evening mode ── */
-	.mode-block,
-	.microstep-block {
+	/* ── Evening helper ── */
+	.mode-block {
 		display: flex;
 		flex-direction: column;
 		gap: 0.9rem;
@@ -1034,19 +940,12 @@
 		border: 1px solid var(--border);
 	}
 
-	.mode-block[data-mode='stuck'] {
-		border-color: rgba(249, 115, 22, 0.28);
-		box-shadow: 0 0 0 1px rgba(249, 115, 22, 0.08), 0 18px 45px rgba(0, 0, 0, 0.18);
-	}
-
-	.mode-block[data-mode='emergency'],
-	.microstep-block {
+	.mode-block {
 		border-color: rgba(255, 112, 67, 0.28);
 		box-shadow: 0 0 0 1px rgba(255, 112, 67, 0.08), 0 18px 45px rgba(0, 0, 0, 0.18);
 	}
 
-	.mode-kicker,
-	.microstep-kicker {
+	.mode-kicker {
 		font-size: 0.72rem;
 		font-weight: 700;
 		letter-spacing: 0.08em;
@@ -1054,56 +953,16 @@
 		color: var(--accent);
 	}
 
-	.mode-copy h2,
-	.microstep-block h2 {
+	.mode-copy h2 {
 		font-size: 1.2rem;
 		line-height: 1.15;
 		color: var(--text);
 	}
 
-	.mode-text,
-	.microstep-task,
-	.microstep-progress {
+	.mode-text {
 		font-size: 0.86rem;
 		line-height: 1.45;
 		color: var(--text-muted);
-	}
-
-	.mode-pills {
-		display: grid;
-		grid-template-columns: repeat(2, minmax(0, 1fr));
-		gap: 0.55rem;
-	}
-
-	.mode-pills button,
-	.microstep-btn {
-		padding: 0.9rem 1rem;
-		border-radius: var(--radius-md);
-		border: 1px solid var(--border);
-		background: var(--field);
-		color: var(--text-dim);
-		font: inherit;
-		font-size: 0.88rem;
-		font-weight: 600;
-		cursor: pointer;
-		transition: border-color 0.18s, background 0.18s, color 0.18s, transform 0.12s;
-	}
-
-	.mode-pills button.active {
-		background: var(--accent-dim);
-		border-color: rgba(249, 115, 22, 0.35);
-		color: var(--text);
-	}
-
-	.mode-pills button:active,
-	.microstep-btn:active {
-		transform: scale(0.98);
-	}
-
-	.microstep-btn {
-		background: linear-gradient(135deg, rgba(249, 115, 22, 0.18), rgba(249, 115, 22, 0.08));
-		border-color: rgba(249, 115, 22, 0.32);
-		color: var(--text);
 	}
 
 	/* ── Checklist ── */
@@ -1642,7 +1501,6 @@
 		}
 
 		.progress-block,
-		.microstep-block,
 		.checklist {
 			grid-column: 2;
 		}
