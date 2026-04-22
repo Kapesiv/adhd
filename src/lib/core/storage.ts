@@ -1,5 +1,5 @@
 import { browser } from '$app/environment';
-import { defaultSettings, type IntensityPreference, type UserSettings } from './state';
+import type { UserSettings } from './state';
 
 const SETTINGS_KEY = 'adhd-iltavahti-v2';
 const INTERACTIONS_KEY = 'adhd-iltavahti-interactions';
@@ -26,51 +26,13 @@ function write<T>(key: string, value: T): void {
 	}
 }
 
-function normalizeSettings(raw: unknown): UserSettings | undefined {
-	if (!raw || typeof raw !== 'object') return undefined;
-
-	const candidate = raw as Partial<UserSettings>;
-	const wakeUpTime =
-		typeof candidate.wakeUpTime === 'string' && /^\d{2}:\d{2}$/.test(candidate.wakeUpTime)
-			? candidate.wakeUpTime
-			: defaultSettings.wakeUpTime;
-	const sleepHours =
-		typeof candidate.sleepHours === 'number' &&
-		Number.isFinite(candidate.sleepHours) &&
-		candidate.sleepHours >= 5 &&
-		candidate.sleepHours <= 10
-			? candidate.sleepHours
-			: defaultSettings.sleepHours;
-
-	const allowedIntensity: IntensityPreference[] = ['light', 'medium', 'hard'];
-	const intensityPreference = allowedIntensity.includes(
-		candidate.intensityPreference as IntensityPreference
-	)
-		? (candidate.intensityPreference as IntensityPreference)
-		: defaultSettings.intensityPreference;
-
-	return {
-		onboardingDone: candidate.onboardingDone === true,
-		wakeUpTime,
-		sleepHours,
-		intensityPreference,
-		selectedSymptoms: Array.isArray(candidate.selectedSymptoms)
-			? candidate.selectedSymptoms.filter((value): value is string => typeof value === 'string')
-			: defaultSettings.selectedSymptoms
-	};
-}
-
 export async function saveSettings(s: UserSettings): Promise<void> {
 	write(SETTINGS_KEY, s);
 }
 
 export async function loadSettings(): Promise<UserSettings | undefined> {
-	const raw = read<unknown>(SETTINGS_KEY, null);
-	const normalized = normalizeSettings(raw);
-	if (normalized) {
-		write(SETTINGS_KEY, normalized);
-	}
-	return normalized;
+	const raw = read<UserSettings | null>(SETTINGS_KEY, null);
+	return raw ?? undefined;
 }
 
 export interface InteractionRecord {
