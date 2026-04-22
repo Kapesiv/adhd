@@ -270,7 +270,7 @@
 	$: allDone = visibleTasks.length > 0 && remaining.length === 0;
 
 	// Switch to done mode when all visible tasks completed
-	$: if (allDone && mode === 'idle') {
+	$: if (allDone && mode === 'idle' && !todayDone) {
 		iltavahti.completeToday();
 		mode = 'done';
 	}
