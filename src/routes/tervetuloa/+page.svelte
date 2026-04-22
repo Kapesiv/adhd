@@ -170,7 +170,7 @@
 		align-items: center;
 		justify-content: center;
 		padding: 2rem;
-		opacity: 0;
+		opacity: 1;
 		transition: opacity 0.3s ease;
 	}
 	.onboarding.fade-in { opacity: 1; }
