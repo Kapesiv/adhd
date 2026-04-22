@@ -51,27 +51,53 @@ function loadState(): IltavahtiState {
 		const saved = window.localStorage.getItem(STORAGE_KEY);
 		if (!saved) return seedState();
 
-		const parsed = JSON.parse(saved) as IltavahtiState;
+		const parsed = JSON.parse(saved) as Partial<IltavahtiState> & { bedtime?: unknown };
+		const criticalLabels = ['Pese hampaat', 'Mene sänkyyn'];
+		const tasks = Array.isArray(parsed.tasks)
+			? parsed.tasks
+					.filter(
+						(task) =>
+							!!task &&
+							typeof task === 'object' &&
+							typeof (task as { label?: unknown }).label === 'string'
+					)
+					.map((task) => {
+						const normalized = task as Partial<Task> & { label: string; id?: string };
+						return {
+							id: typeof normalized.id === 'string' ? normalized.id : createId(),
+							label: normalized.label,
+							done: normalized.done === true,
+							priority:
+								normalized.priority === 'critical' || normalized.priority === 'normal'
+									? normalized.priority
+									: criticalLabels.includes(normalized.label)
+										? 'critical'
+										: 'normal'
+						};
+					})
+			: seedState().tasks;
+		const completedDays = Array.isArray(parsed.completedDays)
+			? parsed.completedDays.filter((value): value is string => typeof value === 'string')
+			: [];
+		const lastResetDate =
+			typeof parsed.lastResetDate === 'string' ? parsed.lastResetDate : todayStr();
 
 		// Migraatio: poista vanha bedtime-kenttä
 		if ('bedtime' in parsed) delete (parsed as any).bedtime;
 
-		// Migraatio: lisää priority vanhoihin taskeihin
-		const criticalLabels = ['Pese hampaat', 'Mene sänkyyn'];
-		parsed.tasks = parsed.tasks.map((t) => ({
-			...t,
-			priority: t.priority ?? (criticalLabels.includes(t.label) ? 'critical' : 'normal')
-		}));
-
-		if (parsed.lastResetDate !== todayStr()) {
+		if (lastResetDate !== todayStr()) {
 			return {
-				...parsed,
 				lastResetDate: todayStr(),
-				tasks: parsed.tasks.map((t) => ({ ...t, done: false }))
+				tasks: tasks.map((task) => ({ ...task, done: false })),
+				completedDays
 			};
 		}
 
-		return parsed;
+		return {
+			tasks,
+			lastResetDate,
+			completedDays
+		};
 	} catch {
 		return seedState();
 	}
@@ -100,8 +126,9 @@ function createIltavahtiStore() {
 		completeToday() {
 			update((s) => {
 				const today = todayStr();
-				if (s.completedDays.includes(today)) return s;
-				return { ...s, completedDays: [...s.completedDays, today] };
+				const completedDays = Array.isArray(s.completedDays) ? s.completedDays : [];
+				if (completedDays.includes(today)) return { ...s, completedDays };
+				return { ...s, completedDays: [...completedDays, today] };
 			});
 		},
 
@@ -132,6 +159,7 @@ export const iltavahti = createIltavahtiStore();
 
 // Laske putki: montako peräkkäistä päivää taaksepäin (eilen, toissapäivänä...)
 export function getStreak(completedDays: string[]): number {
+	if (!Array.isArray(completedDays)) return 0;
 	if (completedDays.length === 0) return 0;
 
 	const set = new Set(completedDays);
@@ -158,6 +186,7 @@ export function getStreak(completedDays: string[]): number {
 }
 
 export function isTodayDone(completedDays: string[]): boolean {
+	if (!Array.isArray(completedDays)) return false;
 	return completedDays.includes(todayStr());
 }
 
