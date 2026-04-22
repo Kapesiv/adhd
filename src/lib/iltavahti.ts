@@ -108,7 +108,7 @@ function createIltavahtiStore() {
 		addTask(label: string) {
 			update((s) => ({
 				...s,
-				tasks: [...s.tasks, { id: createId(), label: label.trim(), done: false }]
+				tasks: [...s.tasks, { id: createId(), label: label.trim(), done: false, priority: 'normal' }]
 			}));
 		},
 

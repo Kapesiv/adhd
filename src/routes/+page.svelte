@@ -216,21 +216,23 @@
 
 <!-- DONE: goodnight + rewards -->
 {#if mode === 'done'}
-	<div class="page">
-		<div class="done-top">
-			<p class="done-clock">{clock(now)}</p>
-			<p class="done-msg">{pickMessage(doneMessages, dateSeed)}</p>
+	<div class="page page-done">
+		<div class="done-shell">
+			<div class="done-top">
+				<p class="done-clock">{clock(now)}</p>
+				<p class="done-msg">{pickMessage(doneMessages, dateSeed)}</p>
 
-			{#if totalDays > 0}
-				<div class="total-badge">{totalDays} {totalDays === 1 ? 'ilta' : 'iltaa'} hoidettu</div>
-			{/if}
-		</div>
+				{#if totalDays > 0}
+					<div class="total-badge">{totalDays} {totalDays === 1 ? 'ilta' : 'iltaa'} hoidettu</div>
+				{/if}
+			</div>
 
-		<div class="rewards">
-			<div class="reward-grid">
-				{#each rewards as r}
-					<a href={r.url} target="_blank" rel="noreferrer" class="reward">{r.label}</a>
-				{/each}
+			<div class="rewards">
+				<div class="reward-grid">
+					{#each rewards as r}
+						<a href={r.url} target="_blank" rel="noreferrer" class="reward">{r.label}</a>
+					{/each}
+				</div>
 			</div>
 		</div>
 
@@ -239,161 +241,174 @@
 
 <!-- IDLE: streak + start -->
 {:else}
-	<div class="page">
-		<div class="idle-top">
-			<p class="idle-clock">{clock(now)}</p>
-			<button class="settings-btn" onclick={() => showSettings = !showSettings}>
-				{showSettings ? 'Sulje' : 'Asetukset'}
-			</button>
-		</div>
+	<div class="page page-idle">
+		<div class="hero-column">
+			<div class="idle-top">
+				<p class="idle-clock">{clock(now)}</p>
+				<button class="settings-btn" onclick={() => showSettings = !showSettings}>
+					{showSettings ? 'Sulje' : 'Asetukset'}
+				</button>
+			</div>
 
-		{#if showSettings}
-			<div class="settings-panel">
-				<label class="setting-row">
-					<span>Herätys</span>
-					<input
-						type="time"
-						value={$settings.wakeUpTime}
-						onchange={(e) => updateSetting('wakeUpTime', (e.currentTarget as HTMLInputElement).value)}
-					/>
-				</label>
+			{#if showSettings}
+				<div class="settings-panel">
+					<label class="setting-row">
+						<span>Herätys</span>
+						<input
+							type="time"
+							value={$settings.wakeUpTime}
+							onchange={(e) => updateSetting('wakeUpTime', (e.currentTarget as HTMLInputElement).value)}
+						/>
+					</label>
 
-				<div class="setting-row">
-					<span>Unen tarve</span>
-					<div class="stepper">
-						<button class="step-btn" onclick={() => updateSetting('sleepHours', Math.max(5, $settings.sleepHours - 0.5))}>−</button>
-						<span class="step-val">{$settings.sleepHours} h</span>
-						<button class="step-btn" onclick={() => updateSetting('sleepHours', Math.min(10, $settings.sleepHours + 0.5))}>+</button>
+					<div class="setting-row">
+						<span>Unen tarve</span>
+						<div class="stepper">
+							<button class="step-btn" onclick={() => updateSetting('sleepHours', Math.max(5, $settings.sleepHours - 0.5))}>−</button>
+							<span class="step-val">{$settings.sleepHours} h</span>
+							<button class="step-btn" onclick={() => updateSetting('sleepHours', Math.min(10, $settings.sleepHours + 0.5))}>+</button>
+						</div>
 					</div>
-				</div>
 
-				<div class="setting-row">
-					<span>Nukkumaanmeno</span>
-					<span class="computed-val">{formatTime(deadline)}</span>
-				</div>
-
-				<label class="setting-row">
-					<span>Painostus</span>
-					<select
-						value={$settings.intensityPreference}
-						onchange={(e) => updateSetting('intensityPreference', (e.currentTarget as HTMLSelectElement).value as UserSettings['intensityPreference'])}
-					>
-						<option value="light">Kevyt</option>
-						<option value="medium">Keskikova</option>
-						<option value="hard">Kova</option>
-					</select>
-				</label>
-			</div>
-		{/if}
-
-		{#if $settings.onboardingDone}
-			<div class="sleep-counter" data-level={level}>
-				<span class="sleep-num">{hoursIfNow.toFixed(1)}</span>
-				<span class="sleep-label">tuntia unta jos menet nyt</span>
-				<span class="deadline-row">Nukkumaan klo {formatTime(deadline)}</span>
-			</div>
-		{/if}
-
-		<div class="progress-block">
-			{#if totalDays > 0}
-				<div class="total-num">{totalDays}</div>
-				<p class="total-label">{totalDays === 1 ? 'ilta hoidettu' : 'iltaa hoidettu'}</p>
-			{:else}
-				<p class="total-label first-time">{pickMessage(idleMessages, dateSeed)}</p>
-			{/if}
-
-			<div class="week">
-				{#each week as day}
-					<div class="day" class:done={day.done} class:today={day.isToday}>
-						<span class="day-dot"></span>
-						<span class="day-label">{day.label}</span>
+					<div class="setting-row">
+						<span>Nukkumaanmeno</span>
+						<span class="computed-val">{formatTime(deadline)}</span>
 					</div>
-				{/each}
-			</div>
-		</div>
 
-		<div class="checklist">
-			{#if criticalOnly && !showAll}
-				<p class="checklist-hint">Myöhä jo — nämä riittää tänään.</p>
-			{/if}
-
-			{#each visibleTasks as task}
-				<button
-					class="check-item"
-					class:checked={task.done}
-					onclick={() => { if (!task.done) { haptic(); playTick(); if (!audioReady) { initAudio(); audioReady = true; } iltavahti.markDone(task.id); } }}
-					disabled={task.done}
-				>
-					<span class="check-dot"></span>
-					<span class="check-label">{task.label}</span>
-				</button>
-			{/each}
-
-			{#if hiddenCount > 0}
-				<button class="show-more-btn" onclick={() => showAll = !showAll}>
-					{showAll ? 'Näytä vain tärkeät' : `+${hiddenCount} muuta`}
-				</button>
-			{/if}
-		</div>
-
-		{#if $settings.onboardingDone}
-			{#if isIos() && !isStandalonePwa()}
-				<div class="install-block">
-					<p class="install-title">Asenna Concentra kotiruutuun</p>
-					<p class="install-hint">iPhonella push-muistutukset toimivat <b>vain</b> kun sovellus on avattu kotiruudulta. Tee näin:</p>
-					<ol class="install-steps">
-						<li><span class="step-num">1</span> Paina <span class="pill">Jaa <span class="share-ico">⎙</span></span> Safarin alapalkista</li>
-						<li><span class="step-num">2</span> Valitse <span class="pill">Lisää Koti-valikkoon</span></li>
-						<li><span class="step-num">3</span> Paina <span class="pill">Lisää</span> oikeassa yläkulmassa</li>
-						<li><span class="step-num">4</span> Avaa Concentra kotiruudun ikonista</li>
-					</ol>
-				</div>
-			{/if}
-
-			<div class="reach-block">
-				<p class="reach-title">Tavoittaminen</p>
-				<p class="reach-hint">Concentra ei voi soittaa sinulle suljettuna. Lataa kalenterimuistutukset tai tilaa push — puhelin huutaa vaikka olet TikTokissa.</p>
-				<button class="reach-btn" onclick={onCalendarDownload}>
-					{calendarSaved ? '✓ Ladattu — avaa kalenterissa' : 'Lataa kalenterimuistutukset'}
-				</button>
-
-				{#if pushConfigured && isPushSupported()}
-					{#if isIos() && !isStandalonePwa()}
-						<p class="reach-warn">Asenna ensin kotiruutuun yllä olevien ohjeiden mukaan.</p>
-					{:else}
-						<button
-							class="reach-btn secondary"
-							onclick={togglePushSubscription}
-							disabled={pushBusy}
+					<label class="setting-row">
+						<span>Painostus</span>
+						<select
+							value={$settings.intensityPreference}
+							onchange={(e) => updateSetting('intensityPreference', (e.currentTarget as HTMLSelectElement).value as UserSettings['intensityPreference'])}
 						>
-							{pushBusy
-								? 'Hetki...'
-								: pushSubscribed
-									? '✓ Push päällä — peru'
-									: 'Tilaa push-muistutukset'}
-						</button>
-						{#if pushError}
-							<p class="reach-warn">{pushError}</p>
-						{/if}
-					{/if}
+							<option value="light">Kevyt</option>
+							<option value="medium">Keskikova</option>
+							<option value="hard">Kova</option>
+						</select>
+					</label>
+				</div>
+			{/if}
+
+			{#if $settings.onboardingDone}
+				<div class="sleep-counter" data-level={level}>
+					<span class="sleep-num">{hoursIfNow.toFixed(1)}</span>
+					<span class="sleep-label">tuntia unta jos menet nyt</span>
+					<span class="deadline-row">Nukkumaan klo {formatTime(deadline)}</span>
+				</div>
+			{/if}
+
+			<div class="progress-block">
+				{#if totalDays > 0}
+					<div class="total-num">{totalDays}</div>
+					<p class="total-label">{totalDays === 1 ? 'ilta hoidettu' : 'iltaa hoidettu'}</p>
+				{:else}
+					<p class="total-label first-time">{pickMessage(idleMessages, dateSeed)}</p>
 				{/if}
 
-				{#if notifPermission === 'default' && !pushConfigured}
-					<button class="reach-btn secondary" onclick={requestNotifPermission}>
-						Salli notifikaatiot tässä selaimessa
-					</button>
-				{:else if notifPermission === 'denied'}
-					<p class="reach-warn">Notifikaatiot estetty. Salli selaimen asetuksista.</p>
-				{/if}
+				<div class="week">
+					{#each week as day}
+						<div class="day" class:done={day.done} class:today={day.isToday}>
+							<span class="day-dot"></span>
+							<span class="day-label">{day.label}</span>
+						</div>
+					{/each}
+				</div>
 			</div>
-		{/if}
+		</div>
 
-		<div class="rewards locked-section">
-			<p class="rewards-hint">Tee ensin iltatoimet.</p>
-			<div class="reward-grid">
-				{#each rewards as r}
-					<div class="reward locked">{r.label}</div>
-				{/each}
+		<div class="main-column">
+			<section class="checklist-card">
+				<div class="section-head">
+					<p class="section-kicker">Tämän illan focus</p>
+					<h2>Kevyt checklist</h2>
+				</div>
+
+				<div class="checklist">
+					{#if criticalOnly && !showAll}
+						<p class="checklist-hint">Myöhä jo — nämä riittää tänään.</p>
+					{/if}
+
+					{#each visibleTasks as task}
+						<button
+							class="check-item"
+							class:checked={task.done}
+							onclick={() => { if (!task.done) { haptic(); playTick(); if (!audioReady) { initAudio(); audioReady = true; } iltavahti.markDone(task.id); } }}
+							disabled={task.done}
+						>
+							<span class="check-dot"></span>
+							<span class="check-label">{task.label}</span>
+						</button>
+					{/each}
+
+					{#if hiddenCount > 0}
+						<button class="show-more-btn" onclick={() => showAll = !showAll}>
+							{showAll ? 'Näytä vain tärkeät' : `+${hiddenCount} muuta`}
+						</button>
+					{/if}
+				</div>
+			</section>
+
+			{#if $settings.onboardingDone}
+				<div class="support-stack">
+					{#if isIos() && !isStandalonePwa()}
+						<div class="install-block">
+							<p class="install-title">Asenna Concentra kotiruutuun</p>
+							<p class="install-hint">iPhonella push-muistutukset toimivat <b>vain</b> kun sovellus on avattu kotiruudulta. Tee näin:</p>
+							<ol class="install-steps">
+								<li><span class="step-num">1</span> Paina <span class="pill">Jaa <span class="share-ico">⎙</span></span> Safarin alapalkista</li>
+								<li><span class="step-num">2</span> Valitse <span class="pill">Lisää Koti-valikkoon</span></li>
+								<li><span class="step-num">3</span> Paina <span class="pill">Lisää</span> oikeassa yläkulmassa</li>
+								<li><span class="step-num">4</span> Avaa Concentra kotiruudun ikonista</li>
+							</ol>
+						</div>
+					{/if}
+
+					<div class="reach-block">
+						<p class="reach-title">Tavoittaminen</p>
+						<p class="reach-hint">Concentra ei voi soittaa sinulle suljettuna. Lataa kalenterimuistutukset tai tilaa push — puhelin huutaa vaikka olet TikTokissa.</p>
+						<button class="reach-btn" onclick={onCalendarDownload}>
+							{calendarSaved ? '✓ Ladattu — avaa kalenterissa' : 'Lataa kalenterimuistutukset'}
+						</button>
+
+						{#if pushConfigured && isPushSupported()}
+							{#if isIos() && !isStandalonePwa()}
+								<p class="reach-warn">Asenna ensin kotiruutuun yllä olevien ohjeiden mukaan.</p>
+							{:else}
+								<button
+									class="reach-btn secondary"
+									onclick={togglePushSubscription}
+									disabled={pushBusy}
+								>
+									{pushBusy
+										? 'Hetki...'
+										: pushSubscribed
+											? '✓ Push päällä — peru'
+											: 'Tilaa push-muistutukset'}
+								</button>
+								{#if pushError}
+									<p class="reach-warn">{pushError}</p>
+								{/if}
+							{/if}
+						{/if}
+
+						{#if notifPermission === 'default' && !pushConfigured}
+							<button class="reach-btn secondary" onclick={requestNotifPermission}>
+								Salli notifikaatiot tässä selaimessa
+							</button>
+						{:else if notifPermission === 'denied'}
+							<p class="reach-warn">Notifikaatiot estetty. Salli selaimen asetuksista.</p>
+						{/if}
+					</div>
+				</div>
+			{/if}
+
+			<div class="rewards locked-section">
+				<p class="rewards-hint">Tee ensin iltatoimet.</p>
+				<div class="reward-grid">
+					{#each rewards as r}
+						<div class="reward locked">{r.label}</div>
+					{/each}
+				</div>
 			</div>
 		</div>
 	</div>
@@ -463,6 +478,46 @@
 		min-height: 100vh;
 		min-height: 100dvh;
 		animation: fadeIn 0.4s ease;
+	}
+
+	.hero-column,
+	.main-column,
+	.support-stack {
+		display: flex;
+		flex-direction: column;
+		gap: 1.25rem;
+	}
+
+	.done-shell,
+	.checklist-card {
+		display: flex;
+		flex-direction: column;
+		gap: 1rem;
+		background: var(--bg-card);
+		backdrop-filter: blur(20px);
+		border: 1px solid var(--border);
+		border-radius: var(--radius-xl);
+		padding: 1.25rem;
+		box-shadow: var(--shadow-md);
+	}
+
+	.section-head {
+		display: flex;
+		flex-direction: column;
+		gap: 0.2rem;
+	}
+
+	.section-kicker {
+		font-size: 0.72rem;
+		text-transform: uppercase;
+		letter-spacing: 0.08em;
+		color: var(--accent);
+	}
+
+	.section-head h2 {
+		font-size: 1.35rem;
+		font-weight: 600;
+		letter-spacing: -0.03em;
 	}
 
 	@keyframes fadeIn {
@@ -726,6 +781,12 @@
 		display: flex;
 		flex-direction: column;
 		gap: 0.5rem;
+	}
+
+	.checklist-hint {
+		font-size: 0.82rem;
+		color: var(--text-muted);
+		padding: 0 0.15rem 0.35rem;
 	}
 
 	.check-item {
@@ -1155,6 +1216,67 @@
 
 		.help-fab {
 			max-width: 100%;
+		}
+	}
+
+	@media (min-width: 960px) {
+		.page {
+			max-width: min(1180px, calc(100vw - 4rem));
+			padding: 3rem 2rem 4rem;
+		}
+
+		.page-idle {
+			display: grid;
+			grid-template-columns: minmax(320px, 390px) minmax(0, 1fr);
+			align-items: start;
+			gap: 2rem;
+		}
+
+		.page-done {
+			max-width: min(980px, calc(100vw - 4rem));
+		}
+
+		.hero-column {
+			position: sticky;
+			top: 2rem;
+			align-self: start;
+		}
+
+		.main-column {
+			gap: 1.5rem;
+		}
+
+		.checklist-card {
+			padding: 1.5rem;
+		}
+
+		.checklist {
+			display: grid;
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+			gap: 0.75rem;
+		}
+
+		.checklist-hint,
+		.show-more-btn {
+			grid-column: 1 / -1;
+		}
+
+		.support-stack {
+			display: grid;
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+			gap: 1rem;
+		}
+
+		.reward-grid {
+			grid-template-columns: repeat(5, minmax(0, 1fr));
+		}
+
+		.done-shell {
+			padding: 1.75rem;
+		}
+
+		.done-top {
+			padding: 2rem 0 1rem;
 		}
 	}
 </style>
