@@ -472,7 +472,7 @@
 		display: flex;
 		flex-direction: column;
 		gap: 1.75rem;
-		max-width: 420px;
+		width: min(100%, 420px);
 		margin: 0 auto;
 		padding: 2.5rem 1.5rem;
 		min-height: 100vh;
@@ -486,6 +486,7 @@
 		display: flex;
 		flex-direction: column;
 		gap: 1.25rem;
+		min-width: 0;
 	}
 
 	.done-shell,
@@ -1219,21 +1220,21 @@
 		}
 	}
 
-	@media (min-width: 960px) {
+	@media (min-width: 820px) {
 		.page {
-			max-width: min(1180px, calc(100vw - 4rem));
+			width: min(100%, 1240px);
 			padding: 3rem 2rem 4rem;
 		}
 
-		.page-idle {
+		.page.page-idle {
 			display: grid;
-			grid-template-columns: minmax(320px, 390px) minmax(0, 1fr);
+			grid-template-columns: minmax(340px, 430px) minmax(0, 1fr);
 			align-items: start;
-			gap: 2rem;
+			gap: 2.25rem;
 		}
 
-		.page-done {
-			max-width: min(980px, calc(100vw - 4rem));
+		.page.page-done {
+			width: min(100%, 1040px);
 		}
 
 		.hero-column {
@@ -1243,7 +1244,7 @@
 		}
 
 		.main-column {
-			gap: 1.5rem;
+			gap: 1.75rem;
 		}
 
 		.checklist-card {
