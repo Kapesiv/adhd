@@ -9,6 +9,40 @@
 		<meta name="apple-mobile-web-app-title" content="Concentra" />
 		<link rel="manifest" href="%sveltekit.assets%/manifest.json" />
 		<link rel="apple-touch-icon" href="%sveltekit.assets%/icons/icon-192x192.png" />
+		<script>
+			(function () {
+				if (typeof window === 'undefined') return;
+				if (!('serviceWorker' in navigator)) return;
+
+				const RESET_KEY = 'concentra-emergency-reset-v1';
+				const params = new URLSearchParams(window.location.search);
+				const shouldReset = params.has('reset') || !sessionStorage.getItem(RESET_KEY);
+
+				if (!shouldReset) return;
+
+				sessionStorage.setItem(RESET_KEY, '1');
+
+				window.addEventListener('load', async () => {
+					try {
+						const registrations = await navigator.serviceWorker.getRegistrations();
+						await Promise.all(registrations.map((registration) => registration.unregister()));
+					} catch {}
+
+					try {
+						if ('caches' in window) {
+							const keys = await caches.keys();
+							await Promise.all(keys.map((key) => caches.delete(key)));
+						}
+					} catch {}
+
+					if (params.has('reset')) {
+						const clean = new URL(window.location.href);
+						clean.searchParams.delete('reset');
+						window.location.replace(clean.toString());
+					}
+				});
+			})();
+		</script>
 		%sveltekit.head%
 	</head>
 	<body data-sveltekit-preload-data="hover">

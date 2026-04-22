@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="fi">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>Concentra Recovery</title>
+		<style>
+			:root {
+				color-scheme: dark;
+				--bg: #08090c;
+				--card: #13151a;
+				--text: #f0f0f3;
+				--muted: #9ca3af;
+				--accent: #f97316;
+				--border: rgba(255, 255, 255, 0.08);
+			}
+
+			* { box-sizing: border-box; }
+
+			body {
+				margin: 0;
+				min-height: 100vh;
+				display: grid;
+				place-items: center;
+				padding: 24px;
+				background: var(--bg);
+				color: var(--text);
+				font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', system-ui, sans-serif;
+			}
+
+			.card {
+				width: min(100%, 560px);
+				background: var(--card);
+				border: 1px solid var(--border);
+				border-radius: 20px;
+				padding: 24px;
+				box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+			}
+
+			h1 {
+				margin: 0 0 12px;
+				font-size: 32px;
+				line-height: 1;
+				letter-spacing: -0.04em;
+			}
+
+			p {
+				margin: 0 0 14px;
+				color: var(--muted);
+				line-height: 1.5;
+			}
+
+			button, a {
+				font: inherit;
+			}
+
+			.actions {
+				display: flex;
+				flex-wrap: wrap;
+				gap: 12px;
+				margin-top: 16px;
+			}
+
+			button {
+				border: none;
+				border-radius: 999px;
+				padding: 12px 18px;
+				background: var(--accent);
+				color: white;
+				cursor: pointer;
+				font-weight: 700;
+			}
+
+			a {
+				display: inline-flex;
+				align-items: center;
+				padding: 12px 18px;
+				border: 1px solid var(--border);
+				border-radius: 999px;
+				text-decoration: none;
+				color: var(--text);
+			}
+
+			#status {
+				margin-top: 18px;
+				font-size: 14px;
+				color: var(--muted);
+				white-space: pre-line;
+			}
+		</style>
+	</head>
+	<body>
+		<div class="card">
+			<h1>Concentra Recovery</h1>
+			<p>
+				Tämä sivu poistaa vanhat service workerit ja cachet, jos selain on jäänyt kiinni mustaan ruutuun
+				tai vanhaan julkaisuun.
+			</p>
+			<p>
+				Paina alla olevaa nappia. Kun puhdistus on valmis, sivu avaa Concentran uudestaan puhtaana.
+			</p>
+
+			<div class="actions">
+				<button id="reset-btn" type="button">Korjaa sivu nyt</button>
+				<a href="/adhd/?reset=1">Avaa reset-parametrilla</a>
+			</div>
+
+			<div id="status">Valmis käynnistämään puhdistuksen.</div>
+		</div>
+
+		<script>
+			const statusEl = document.getElementById('status');
+			const button = document.getElementById('reset-btn');
+
+			async function recover() {
+				statusEl.textContent = 'Poistetaan service workerit...';
+
+				try {
+					if ('serviceWorker' in navigator) {
+						const registrations = await navigator.serviceWorker.getRegistrations();
+						await Promise.all(registrations.map((registration) => registration.unregister()));
+					}
+				} catch (error) {
+					statusEl.textContent = `Service workerien poisto epäonnistui: ${error}`;
+					return;
+				}
+
+				statusEl.textContent = 'Poistetaan cachet...';
+
+				try {
+					if ('caches' in window) {
+						const keys = await caches.keys();
+						await Promise.all(keys.map((key) => caches.delete(key)));
+					}
+				} catch (error) {
+					statusEl.textContent = `Cachejen poisto epäonnistui: ${error}`;
+					return;
+				}
+
+				statusEl.textContent = 'Tyhjennetään localStorage ja avataan sovellus uudestaan...';
+
+				try {
+					localStorage.clear();
+					sessionStorage.clear();
+				} catch {}
+
+				setTimeout(() => {
+					window.location.replace('/adhd/?reset=1');
+				}, 300);
+			}
+
+			button.addEventListener('click', recover);
+		</script>
+	</body>
+</html>
