@@ -36,6 +36,7 @@
 	const PUSH_BACKEND_URL = import.meta.env.VITE_PUSH_BACKEND_URL as string | undefined;
 	const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY as string | undefined;
 	const pushConfigured = !!(PUSH_BACKEND_URL && VAPID_PUBLIC_KEY);
+	const IPHONE_SETUP_KEY = 'concentra-iphone-setup-v1';
 	const distractionOptions = ['TikTok', 'Instagram', 'Reddit', 'YouTube', 'Safari', 'X'];
 	// --- State ---
 	let now = new Date();
@@ -51,6 +52,9 @@
 	let stuckTaskId = '';
 	let stuckStepIndex = 0;
 	let distractionApps = ['TikTok', 'Instagram', 'Reddit'];
+	let iphoneSetupDone = false;
+	let editingIphoneSetup = false;
+	let setupHydrated = false;
 
 	let level: IntensityLevel = 'calm';
 
@@ -111,9 +115,43 @@
 
 	onMount(async () => {
 		if (!browser) return;
+		try {
+			const raw = localStorage.getItem(IPHONE_SETUP_KEY);
+			if (raw) {
+				const saved = JSON.parse(raw) as {
+					distractionApps?: unknown;
+					setupStep?: unknown;
+					iphoneSetupDone?: unknown;
+				};
+				if (Array.isArray(saved.distractionApps)) {
+					distractionApps = saved.distractionApps.filter((value): value is string => typeof value === 'string');
+				}
+				if (saved.setupStep === 1 || saved.setupStep === 2 || saved.setupStep === 3) {
+					setupStep = saved.setupStep;
+				}
+				if (typeof saved.iphoneSetupDone === 'boolean') {
+					iphoneSetupDone = saved.iphoneSetupDone;
+				}
+			}
+		} catch {
+			// ignore broken local state
+		}
+
 		const state = await getSubscriptionState();
 		pushSubscribed = state.subscribed;
+		setupHydrated = true;
 	});
+
+	$: if (browser && setupHydrated) {
+		localStorage.setItem(
+			IPHONE_SETUP_KEY,
+			JSON.stringify({
+				distractionApps,
+				setupStep,
+				iphoneSetupDone
+			})
+		);
+	}
 
 	async function togglePushSubscription() {
 		if (!pushConfigured || !PUSH_BACKEND_URL || !VAPID_PUBLIC_KEY) return;
@@ -291,6 +329,17 @@
 			return;
 		}
 		distractionApps = [...distractionApps, label];
+	}
+
+	function finishIphoneSetup() {
+		iphoneSetupDone = true;
+		editingIphoneSetup = false;
+	}
+
+	function editIphoneSetup() {
+		editingIphoneSetup = true;
+		iphoneSetupDone = false;
+		setupStep = 1;
 	}
 
 	function advanceStuckStep() {
@@ -482,103 +531,141 @@
 		</div>
 
 		{#if $settings.onboardingDone}
-			<div class="iphone-setup-block">
-				<div class="setup-head">
-					<div>
-						<p class="setup-kicker">IPhone-ilta-setup</p>
-						<h2>
-							{#if setupStep === 1}
-								Valitse häiriöappit
-							{:else if setupStep === 2}
-								Laita muistutukset päälle
-							{:else}
-								Laita iltasuoja iPhoneen
-							{/if}
-						</h2>
+			<div class="iphone-setup-block" class:setup-summary={iphoneSetupDone && !editingIphoneSetup}>
+				{#if iphoneSetupDone && !editingIphoneSetup}
+					<div class="setup-head">
+						<div>
+							<p class="setup-kicker">IPhone-ilta-setup</p>
+							<h2>Setup valmiina</h2>
+						</div>
 					</div>
-					<div class="setup-dots" aria-label="Setupin eteneminen">
-						<span class:active={setupStep === 1}></span>
-						<span class:active={setupStep === 2}></span>
-						<span class:active={setupStep === 3}></span>
-					</div>
-				</div>
 
-				{#if setupStep === 1}
-					<p class="setup-text">Valitse vain ne appit, jotka vievät sinut pois iltarutiinista. Ei tarvitse valita kaikkea.</p>
-					<div class="setup-app-grid">
-						{#each distractionOptions as app}
-							<button class:selected={distractionApps.includes(app)} onclick={() => toggleDistractionApp(app)}>
-								{app}
-							</button>
-						{/each}
-					</div>
-					<p class="setup-note">Näitä käytetään seuraavassa vaiheessa, kun laitat iPhonelle iltarajat.</p>
-				{:else if setupStep === 2}
-					{#if isIos() && !isStandalonePwa()}
-						<p class="setup-text">Jotta muistutukset toimivat iPhonessa kunnolla, avaa Concentra kotinäytöltä appina.</p>
-						<div class="setup-steps">
-							<div class="setup-step"><span class="step-num">1</span><span>Paina Safarissa <span class="pill">Jaa ⎙</span></span></div>
-							<div class="setup-step"><span class="step-num">2</span><span>Valitse <span class="pill">Lisää Koti-valikkoon</span></span></div>
-							<div class="setup-step"><span class="step-num">3</span><span>Avaa Concentra kotinäytön ikonista</span></div>
-						</div>
-					{:else}
-						<p class="setup-text">Laita muistutukset päälle, jotta Concentra voi pysäyttää sinut oikealla hetkellä.</p>
-						<button
-							class="reach-btn"
-							onclick={pushConfigured && isPushSupported() ? togglePushSubscription : requestNotifPermission}
-							disabled={pushBusy}
-						>
-							{#if pushConfigured && isPushSupported()}
-								{pushBusy
-									? 'Hetki...'
-									: pushSubscribed
-										? '✓ Muistutukset päällä'
-										: 'Laita muistutukset päälle'}
-							{:else}
-								Salli ilmoitukset tässä selaimessa
-							{/if}
-						</button>
-						{#if pushError}
-							<p class="reach-warn">{pushError}</p>
-						{:else if notifPermission === 'denied'}
-							<p class="reach-warn">Ilmoitukset on estetty. Salli ne iPhonen asetuksista.</p>
-						{/if}
-					{/if}
-				{:else}
-					<p class="setup-text">Tee tämä kerran iPhonessa, niin ilta ei karkaa yhtä helposti käsistä.</p>
-					<div class="setup-steps">
-						<div class="setup-step">
-							<span class="step-num">1</span>
-							<span>Avaa <span class="pill">Asetukset</span> → <span class="pill">Ruutuaika</span> → <span class="pill">Appirajat</span></span>
-						</div>
-						<div class="setup-step">
-							<span class="step-num">2</span>
-							<span>Lisää nämä appit rajalle:</span>
-						</div>
-					</div>
+					<p class="setup-text">Iltasuunta on nyt rakennettu. Voit palata tähän myöhemmin, jos haluat vaihtaa appeja tai käydä ohjeen uudelleen.</p>
+
 					<div class="setup-selected">
 						{#each distractionApps as app}
 							<span>{app}</span>
 						{/each}
 					</div>
-					<p class="setup-note">Jos haluat kovemman stopin, pidä appia pohjassa ja valitse <b>Vaadi Face ID</b>.</p>
-					<button class="reach-btn secondary" onclick={onCalendarDownload}>
-						{calendarSaved ? '✓ Kalenteri ladattu' : 'Lataa varmuudeksi kalenterimuistutukset'}
-					</button>
-				{/if}
 
-				<div class="setup-nav">
-					{#if setupStep > 1}
-						<button class="reach-btn secondary" onclick={() => (setupStep = (setupStep - 1) as SetupStep)}>
-							Takaisin
+					<div class="setup-status">
+						<div class="setup-status-row">
+							<span>Muistutukset</span>
+							<strong>{pushSubscribed || notifPermission === 'granted' ? 'Päällä tai sallittu' : 'Tarkista vielä'}</strong>
+						</div>
+						<div class="setup-status-row">
+							<span>Lukittavat appit</span>
+							<strong>{distractionApps.length} valittu</strong>
+						</div>
+					</div>
+
+					<div class="setup-nav">
+						<button class="reach-btn secondary" onclick={editIphoneSetup}>
+							Muokkaa setupia
+						</button>
+					</div>
+				{:else}
+					<div class="setup-head">
+						<div>
+							<p class="setup-kicker">IPhone-ilta-setup</p>
+							<h2>
+								{#if setupStep === 1}
+									Valitse häiriöappit
+								{:else if setupStep === 2}
+									Laita muistutukset päälle
+								{:else}
+									Laita iltasuoja iPhoneen
+								{/if}
+							</h2>
+						</div>
+						<div class="setup-dots" aria-label="Setupin eteneminen">
+							<span class:active={setupStep === 1}></span>
+							<span class:active={setupStep === 2}></span>
+							<span class:active={setupStep === 3}></span>
+						</div>
+					</div>
+
+					{#if setupStep === 1}
+						<p class="setup-text">Valitse vain ne appit, jotka vievät sinut pois iltarutiinista. Ei tarvitse valita kaikkea.</p>
+						<div class="setup-app-grid">
+							{#each distractionOptions as app}
+								<button class:selected={distractionApps.includes(app)} onclick={() => toggleDistractionApp(app)}>
+									{app}
+								</button>
+							{/each}
+						</div>
+						<p class="setup-note">Näitä käytetään seuraavassa vaiheessa, kun laitat iPhonelle iltarajat.</p>
+					{:else if setupStep === 2}
+						{#if isIos() && !isStandalonePwa()}
+							<p class="setup-text">Jotta muistutukset toimivat iPhonessa kunnolla, avaa Concentra kotinäytöltä appina.</p>
+							<div class="setup-steps">
+								<div class="setup-step"><span class="step-num">1</span><span>Paina Safarissa <span class="pill">Jaa ⎙</span></span></div>
+								<div class="setup-step"><span class="step-num">2</span><span>Valitse <span class="pill">Lisää Koti-valikkoon</span></span></div>
+								<div class="setup-step"><span class="step-num">3</span><span>Avaa Concentra kotinäytön ikonista</span></div>
+							</div>
+						{:else}
+							<p class="setup-text">Laita muistutukset päälle, jotta Concentra voi pysäyttää sinut oikealla hetkellä.</p>
+							<button
+								class="reach-btn"
+								onclick={pushConfigured && isPushSupported() ? togglePushSubscription : requestNotifPermission}
+								disabled={pushBusy}
+							>
+								{#if pushConfigured && isPushSupported()}
+									{pushBusy
+										? 'Hetki...'
+										: pushSubscribed
+											? '✓ Muistutukset päällä'
+											: 'Laita muistutukset päälle'}
+								{:else}
+									Salli ilmoitukset tässä selaimessa
+								{/if}
+							</button>
+							{#if pushError}
+								<p class="reach-warn">{pushError}</p>
+							{:else if notifPermission === 'denied'}
+								<p class="reach-warn">Ilmoitukset on estetty. Salli ne iPhonen asetuksista.</p>
+							{/if}
+						{/if}
+					{:else}
+						<p class="setup-text">Tee tämä kerran iPhonessa, niin ilta ei karkaa yhtä helposti käsistä.</p>
+						<div class="setup-steps">
+							<div class="setup-step">
+								<span class="step-num">1</span>
+								<span>Avaa <span class="pill">Asetukset</span> → <span class="pill">Ruutuaika</span> → <span class="pill">Appirajat</span></span>
+							</div>
+							<div class="setup-step">
+								<span class="step-num">2</span>
+								<span>Lisää nämä appit rajalle:</span>
+							</div>
+						</div>
+						<div class="setup-selected">
+							{#each distractionApps as app}
+								<span>{app}</span>
+							{/each}
+						</div>
+						<p class="setup-note">Jos haluat kovemman stopin, pidä appia pohjassa ja valitse <b>Vaadi Face ID</b>.</p>
+						<button class="reach-btn secondary" onclick={onCalendarDownload}>
+							{calendarSaved ? '✓ Kalenteri ladattu' : 'Lataa varmuudeksi kalenterimuistutukset'}
 						</button>
 					{/if}
-					{#if setupStep < 3}
-						<button class="reach-btn" onclick={() => (setupStep = (setupStep + 1) as SetupStep)}>
-							Jatka
-						</button>
-					{/if}
-				</div>
+
+					<div class="setup-nav">
+						{#if setupStep > 1}
+							<button class="reach-btn secondary" onclick={() => (setupStep = (setupStep - 1) as SetupStep)}>
+								Takaisin
+							</button>
+						{/if}
+						{#if setupStep < 3}
+							<button class="reach-btn" onclick={() => (setupStep = (setupStep + 1) as SetupStep)}>
+								Jatka
+							</button>
+						{:else}
+							<button class="reach-btn" onclick={finishIphoneSetup}>
+								Valmis
+							</button>
+						{/if}
+					</div>
+				{/if}
 			</div>
 		{/if}
 
@@ -1128,6 +1215,10 @@
 		border: 1px solid var(--border);
 	}
 
+	.iphone-setup-block.setup-summary {
+		gap: 0.9rem;
+	}
+
 	.setup-head {
 		display: flex;
 		justify-content: space-between;
@@ -1232,6 +1323,30 @@
 		color: var(--text);
 		font-size: 0.82rem;
 		font-weight: 600;
+	}
+
+	.setup-status {
+		display: flex;
+		flex-direction: column;
+		gap: 0.55rem;
+	}
+
+	.setup-status-row {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		gap: 1rem;
+		padding: 0.8rem 0.95rem;
+		border-radius: var(--radius-md);
+		background: var(--field);
+		border: 1px solid var(--border);
+		font-size: 0.84rem;
+		color: var(--text-dim);
+	}
+
+	.setup-status-row strong {
+		color: var(--text);
+		font-size: 0.88rem;
 	}
 
 	.setup-nav {
