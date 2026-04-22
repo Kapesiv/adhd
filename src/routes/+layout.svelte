@@ -8,13 +8,14 @@
 	import { settings } from '$lib/core/state';
 	import { loadSettings } from '$lib/core/storage';
 
-	if (browser && 'serviceWorker' in navigator) {
-		navigator.serviceWorker.register(`${base}/sw.js`);
-	}
-
 	let { children } = $props();
 
 	onMount(async () => {
+		if (browser && 'serviceWorker' in navigator) {
+			const registrations = await navigator.serviceWorker.getRegistrations();
+			await Promise.all(registrations.map((registration) => registration.unregister()));
+		}
+
 		const saved = await loadSettings();
 		if (saved) settings.set(saved);
 
