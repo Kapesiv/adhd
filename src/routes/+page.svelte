@@ -620,11 +620,69 @@
 <!-- IDLE: streak + start -->
 {:else}
 	<div class="page">
-		<div class="idle-top">
-			<p class="idle-clock">{clock(now)}</p>
-			<button class="settings-btn" onclick={() => showSettings = !showSettings}>
-				{showSettings ? 'Sulje' : 'Asetukset'}
-			</button>
+		<div class="hero-block" data-level={level}>
+			<div class="hero-topbar">
+				<div class="hero-time">
+					<p class="hero-clock">{clock(now)}</p>
+					<p class="hero-mood">
+						{#if criticalOnly}
+							Hiljennä ilta. Tee vain tärkein.
+						{:else}
+							{pickMessage(idleMessages, dateSeed)}
+						{/if}
+					</p>
+				</div>
+
+				<button class="settings-btn" onclick={() => showSettings = !showSettings}>
+					{showSettings ? 'Sulje' : 'Asetukset'}
+				</button>
+			</div>
+
+			<div class="hero-main">
+				<div class="hero-copy">
+					<p class="hero-kicker">Yöikkuna</p>
+					<h1>Ilta voi rauhoittua tästä.</h1>
+					<p class="hero-text">
+						Katso vain yhtä seuraavaa asiaa. Muu saa odottaa hetken.
+					</p>
+				</div>
+
+				<div class="hero-window" aria-hidden="true">
+					<div class="hero-window-frame"></div>
+					<div class="hero-moon"></div>
+					<div class="hero-glow"></div>
+				</div>
+			</div>
+
+			{#if $settings.onboardingDone}
+				<div class="hero-sleep">
+					<div class="hero-sleep-value">{hoursIfNow.toFixed(1)}</div>
+					<div class="hero-sleep-copy">
+						<p>tuntia unta jos menet nyt</p>
+						<span>Nukkumaan klo {formatTime(deadline)}</span>
+					</div>
+				</div>
+			{/if}
+
+			<div class="hero-footer">
+				<div class="hero-progress">
+					{#if totalDays > 0}
+						<strong>{totalDays}</strong>
+						<span>{totalDays === 1 ? 'ilta hoidettu' : 'iltaa hoidettu'}</span>
+					{:else}
+						<span>{pickMessage(idleMessages, dateSeed)}</span>
+					{/if}
+				</div>
+
+				<div class="week hero-week">
+					{#each week as day}
+						<div class="day" class:done={day.done} class:today={day.isToday}>
+							<span class="day-dot"></span>
+							<span class="day-label">{day.label}</span>
+						</div>
+					{/each}
+				</div>
+			</div>
 		</div>
 
 		{#if showSettings}
@@ -669,32 +727,6 @@
 				</button>
 			</div>
 		{/if}
-
-		{#if $settings.onboardingDone}
-			<div class="sleep-counter" data-level={level}>
-				<span class="sleep-num">{hoursIfNow.toFixed(1)}</span>
-				<span class="sleep-label">tuntia unta jos menet nyt</span>
-				<span class="deadline-row">Nukkumaan klo {formatTime(deadline)}</span>
-			</div>
-		{/if}
-
-		<div class="progress-block">
-			{#if totalDays > 0}
-				<div class="total-num">{totalDays}</div>
-				<p class="total-label">{totalDays === 1 ? 'ilta hoidettu' : 'iltaa hoidettu'}</p>
-			{:else}
-				<p class="total-label first-time">{pickMessage(idleMessages, dateSeed)}</p>
-			{/if}
-
-			<div class="week">
-				{#each week as day}
-					<div class="day" class:done={day.done} class:today={day.isToday}>
-						<span class="day-dot"></span>
-						<span class="day-label">{day.label}</span>
-					</div>
-				{/each}
-			</div>
-		</div>
 
 		<div class="mode-block">
 			<div class="mode-copy">
@@ -752,211 +784,234 @@
 			{/if}
 		</div>
 
-		{#if $settings.onboardingDone}
-			<div class="iphone-setup-block" class:setup-summary={iphoneSetupDone && !editingIphoneSetup}>
-				{#if iphoneSetupDone && !editingIphoneSetup}
-					<div class="setup-head">
-						<div>
-							<p class="setup-kicker">IPhone-ilta-setup</p>
-							<h2>Setup valmiina</h2>
+		<div class="utility-stack">
+			{#if $settings.onboardingDone}
+				<details class="utility-panel">
+					<summary>
+						<div class="utility-summary-copy">
+							<p class="utility-kicker">Apu iPhonelle</p>
+							<strong>IPhone-ilta-setup</strong>
 						</div>
-					</div>
+						<span class="utility-summary-meta">
+							{iphoneSetupDone ? 'Valmiina' : `Vaihe ${setupStep}/3`}
+						</span>
+					</summary>
 
-					<p class="setup-text">Iltasuunta on nyt rakennettu. Voit palata tähän myöhemmin, jos haluat vaihtaa appeja tai käydä ohjeen uudelleen.</p>
+					<div class="utility-panel-body">
+						<div class="iphone-setup-block" class:setup-summary={iphoneSetupDone && !editingIphoneSetup}>
+							{#if iphoneSetupDone && !editingIphoneSetup}
+								<div class="setup-head">
+									<div>
+										<p class="setup-kicker">IPhone-ilta-setup</p>
+										<h2>Setup valmiina</h2>
+									</div>
+								</div>
 
-					<div class="setup-selected">
-						{#each distractionApps as app}
-							<span>{app}</span>
-						{/each}
-					</div>
+								<p class="setup-text">Iltasuunta on nyt rakennettu. Voit palata tähän myöhemmin, jos haluat vaihtaa appeja tai käydä ohjeen uudelleen.</p>
 
-					<div class="setup-status">
-						<div class="setup-status-row">
-							<span>Muistutukset</span>
-							<strong>{pushSubscribed || notifPermission === 'granted' ? 'Päällä tai sallittu' : 'Tarkista vielä'}</strong>
-						</div>
-						<div class="setup-status-row">
-							<span>Lukittavat appit</span>
-							<strong>{distractionApps.length} valittu</strong>
-						</div>
-					</div>
+								<div class="setup-selected">
+									{#each distractionApps as app}
+										<span>{app}</span>
+									{/each}
+								</div>
 
-					<div class="setup-nav">
-						<button class="reach-btn secondary" onclick={editIphoneSetup}>
-							Muokkaa setupia
-						</button>
-					</div>
-				{:else}
-					<div class="setup-head">
-						<div>
-							<p class="setup-kicker">IPhone-ilta-setup</p>
-							<h2>
+								<div class="setup-status">
+									<div class="setup-status-row">
+										<span>Muistutukset</span>
+										<strong>{pushSubscribed || notifPermission === 'granted' ? 'Päällä tai sallittu' : 'Tarkista vielä'}</strong>
+									</div>
+									<div class="setup-status-row">
+										<span>Lukittavat appit</span>
+										<strong>{distractionApps.length} valittu</strong>
+									</div>
+								</div>
+
+								<div class="setup-nav">
+									<button class="reach-btn secondary" onclick={editIphoneSetup}>
+										Muokkaa setupia
+									</button>
+								</div>
+							{:else}
+								<div class="setup-head">
+									<div>
+										<p class="setup-kicker">IPhone-ilta-setup</p>
+										<h2>
+											{#if setupStep === 1}
+												Valitse häiriöappit
+											{:else if setupStep === 2}
+												Laita muistutukset päälle
+											{:else}
+												Laita iltasuoja iPhoneen
+											{/if}
+										</h2>
+									</div>
+									<div class="setup-dots" aria-label="Setupin eteneminen">
+										<span class:active={setupStep === 1}></span>
+										<span class:active={setupStep === 2}></span>
+										<span class:active={setupStep === 3}></span>
+									</div>
+								</div>
+
 								{#if setupStep === 1}
-									Valitse häiriöappit
+									<p class="setup-text">Valitse vain ne appit, jotka vievät sinut pois iltarutiinista. Ei tarvitse valita kaikkea.</p>
+									<div class="setup-app-grid">
+										{#each distractionOptions as app}
+											<button class:selected={distractionApps.includes(app)} onclick={() => toggleDistractionApp(app)}>
+												{app}
+											</button>
+										{/each}
+									</div>
+									<p class="setup-note">Näitä käytetään seuraavassa vaiheessa, kun laitat iPhonelle iltarajat.</p>
 								{:else if setupStep === 2}
-									Laita muistutukset päälle
+									{#if isIos() && !isStandalonePwa()}
+										<p class="setup-text">Jotta muistutukset toimivat iPhonessa kunnolla, avaa Concentra kotinäytöltä appina.</p>
+										<div class="setup-steps">
+											<div class="setup-step"><span class="step-num">1</span><span>Paina Safarissa <span class="pill">Jaa ⎙</span></span></div>
+											<div class="setup-step"><span class="step-num">2</span><span>Valitse <span class="pill">Lisää Koti-valikkoon</span></span></div>
+											<div class="setup-step"><span class="step-num">3</span><span>Avaa Concentra kotinäytön ikonista</span></div>
+										</div>
+									{:else}
+										<p class="setup-text">Laita muistutukset päälle, jotta Concentra voi pysäyttää sinut oikealla hetkellä.</p>
+										<button
+											class="reach-btn"
+											onclick={pushConfigured && isPushSupported() ? togglePushSubscription : requestNotifPermission}
+											disabled={pushBusy}
+										>
+											{#if pushConfigured && isPushSupported()}
+												{pushBusy
+													? 'Hetki...'
+													: pushSubscribed
+														? '✓ Muistutukset päällä'
+														: 'Laita muistutukset päälle'}
+											{:else}
+												Salli ilmoitukset tässä selaimessa
+											{/if}
+										</button>
+										{#if pushError}
+											<p class="reach-warn">{pushError}</p>
+										{:else if notifPermission === 'denied'}
+											<p class="reach-warn">Ilmoitukset on estetty. Salli ne iPhonen asetuksista.</p>
+										{/if}
+									{/if}
 								{:else}
-									Laita iltasuoja iPhoneen
+									<p class="setup-text">Tee tämä kerran iPhonessa, niin ilta ei karkaa yhtä helposti käsistä.</p>
+									<div class="setup-steps">
+										<div class="setup-step">
+											<span class="step-num">1</span>
+											<span>Avaa <span class="pill">Asetukset</span> → <span class="pill">Ruutuaika</span> → <span class="pill">Appirajat</span></span>
+										</div>
+										<div class="setup-step">
+											<span class="step-num">2</span>
+											<span>Lisää nämä appit rajalle:</span>
+										</div>
+									</div>
+									<div class="setup-selected">
+										{#each distractionApps as app}
+											<span>{app}</span>
+										{/each}
+									</div>
+									<p class="setup-note">Jos haluat kovemman stopin, pidä appia pohjassa ja valitse <b>Vaadi Face ID</b>.</p>
+									<button class="reach-btn secondary" onclick={onCalendarDownload}>
+										{calendarSaved ? '✓ Kalenteri ladattu' : 'Lataa varmuudeksi kalenterimuistutukset'}
+									</button>
 								{/if}
-							</h2>
-						</div>
-						<div class="setup-dots" aria-label="Setupin eteneminen">
-							<span class:active={setupStep === 1}></span>
-							<span class:active={setupStep === 2}></span>
-							<span class:active={setupStep === 3}></span>
-						</div>
-					</div>
 
-					{#if setupStep === 1}
-						<p class="setup-text">Valitse vain ne appit, jotka vievät sinut pois iltarutiinista. Ei tarvitse valita kaikkea.</p>
-						<div class="setup-app-grid">
-							{#each distractionOptions as app}
-								<button class:selected={distractionApps.includes(app)} onclick={() => toggleDistractionApp(app)}>
-									{app}
-								</button>
-							{/each}
-						</div>
-						<p class="setup-note">Näitä käytetään seuraavassa vaiheessa, kun laitat iPhonelle iltarajat.</p>
-					{:else if setupStep === 2}
-						{#if isIos() && !isStandalonePwa()}
-							<p class="setup-text">Jotta muistutukset toimivat iPhonessa kunnolla, avaa Concentra kotinäytöltä appina.</p>
-							<div class="setup-steps">
-								<div class="setup-step"><span class="step-num">1</span><span>Paina Safarissa <span class="pill">Jaa ⎙</span></span></div>
-								<div class="setup-step"><span class="step-num">2</span><span>Valitse <span class="pill">Lisää Koti-valikkoon</span></span></div>
-								<div class="setup-step"><span class="step-num">3</span><span>Avaa Concentra kotinäytön ikonista</span></div>
-							</div>
-						{:else}
-							<p class="setup-text">Laita muistutukset päälle, jotta Concentra voi pysäyttää sinut oikealla hetkellä.</p>
-							<button
-								class="reach-btn"
-								onclick={pushConfigured && isPushSupported() ? togglePushSubscription : requestNotifPermission}
-								disabled={pushBusy}
-							>
-								{#if pushConfigured && isPushSupported()}
-									{pushBusy
-										? 'Hetki...'
-										: pushSubscribed
-											? '✓ Muistutukset päällä'
-											: 'Laita muistutukset päälle'}
-								{:else}
-									Salli ilmoitukset tässä selaimessa
-								{/if}
-							</button>
-							{#if pushError}
-								<p class="reach-warn">{pushError}</p>
-							{:else if notifPermission === 'denied'}
-								<p class="reach-warn">Ilmoitukset on estetty. Salli ne iPhonen asetuksista.</p>
+								<div class="setup-nav">
+									{#if setupStep > 1}
+										<button class="reach-btn secondary" onclick={() => (setupStep = (setupStep - 1) as SetupStep)}>
+											Takaisin
+										</button>
+									{/if}
+									{#if setupStep < 3}
+										<button class="reach-btn" onclick={() => (setupStep = (setupStep + 1) as SetupStep)}>
+											Jatka
+										</button>
+									{:else}
+										<button class="reach-btn" onclick={finishIphoneSetup}>
+											Valmis
+										</button>
+									{/if}
+								</div>
 							{/if}
-						{/if}
-					{:else}
-						<p class="setup-text">Tee tämä kerran iPhonessa, niin ilta ei karkaa yhtä helposti käsistä.</p>
-						<div class="setup-steps">
-							<div class="setup-step">
-								<span class="step-num">1</span>
-								<span>Avaa <span class="pill">Asetukset</span> → <span class="pill">Ruutuaika</span> → <span class="pill">Appirajat</span></span>
-							</div>
-							<div class="setup-step">
-								<span class="step-num">2</span>
-								<span>Lisää nämä appit rajalle:</span>
-							</div>
 						</div>
-						<div class="setup-selected">
-							{#each distractionApps as app}
-								<span>{app}</span>
-							{/each}
-						</div>
-						<p class="setup-note">Jos haluat kovemman stopin, pidä appia pohjassa ja valitse <b>Vaadi Face ID</b>.</p>
-						<button class="reach-btn secondary" onclick={onCalendarDownload}>
-							{calendarSaved ? '✓ Kalenteri ladattu' : 'Lataa varmuudeksi kalenterimuistutukset'}
-						</button>
-					{/if}
+					</div>
+				</details>
+			{/if}
 
-					<div class="setup-nav">
-						{#if setupStep > 1}
-							<button class="reach-btn secondary" onclick={() => (setupStep = (setupStep - 1) as SetupStep)}>
-								Takaisin
+			<details class="utility-panel">
+				<summary>
+					<div class="utility-summary-copy">
+						<p class="utility-kicker">Muistiin</p>
+						<strong>Nopea kalenteri</strong>
+					</div>
+					<span class="utility-summary-meta">{sortedCalendarEntries.length} merkintää</span>
+				</summary>
+
+				<div class="utility-panel-body">
+					<div class="calendar-capture-block">
+						<div class="calendar-head">
+							<div>
+								<p class="calendar-kicker">Kalenteri</p>
+								<h2>Kirjoita merkintä nopeasti</h2>
+							</div>
+							<p class="calendar-helper">Esim. `27.5 terapia 14:00` tai `28.5 laskun eräpäivä`</p>
+						</div>
+
+						<div class="calendar-compose">
+							<input
+								class="calendar-input"
+								type="text"
+								bind:value={quickCalendarInput}
+								placeholder="27.5 terapia 14:00"
+								onkeydown={(event) => {
+									if (event.key === 'Enter') {
+										event.preventDefault();
+										createCalendarEntry();
+									}
+								}}
+							/>
+							<button class="reach-btn" type="button" onclick={createCalendarEntry}>
+								Lisää kalenteriin
 							</button>
+						</div>
+
+						<p class="calendar-note">
+							Concentra tekee kalenterimerkinnän valmiiksi. Hyväksyt sen kerran, ja se menee puhelimen kalenteriin.
+						</p>
+
+						{#if quickCalendarError}
+							<p class="reach-warn">{quickCalendarError}</p>
+						{:else if quickCalendarSuccess}
+							<p class="calendar-success">{quickCalendarSuccess}</p>
 						{/if}
-						{#if setupStep < 3}
-							<button class="reach-btn" onclick={() => (setupStep = (setupStep + 1) as SetupStep)}>
-								Jatka
-							</button>
-						{:else}
-							<button class="reach-btn" onclick={finishIphoneSetup}>
-								Valmis
-							</button>
+
+						{#if sortedCalendarEntries.length > 0}
+							<div class="calendar-list">
+								{#each sortedCalendarEntries as entry}
+									<div class="calendar-item">
+										<div class="calendar-item-copy">
+											<strong>{entry.title}</strong>
+											<span>{formatCalendarEntry(entry)}</span>
+										</div>
+										<div class="calendar-item-actions">
+											<button class="reach-btn secondary" type="button" onclick={() => redownloadCalendarEntry(entry)}>
+												Avaa uudelleen
+											</button>
+											<button class="reach-btn secondary calendar-delete" type="button" onclick={() => removeCalendarEntry(entry.id)}>
+												Poista
+											</button>
+										</div>
+									</div>
+								{/each}
+							</div>
 						{/if}
 					</div>
-				{/if}
-			</div>
-		{/if}
-
-		<div class="calendar-capture-block">
-			<div class="calendar-head">
-				<div>
-					<p class="calendar-kicker">Kalenteri</p>
-					<h2>Kirjoita merkintä nopeasti</h2>
 				</div>
-				<p class="calendar-helper">Esim. `27.5 terapia 14:00` tai `28.5 laskun eräpäivä`</p>
-			</div>
-
-			<div class="calendar-compose">
-				<input
-					class="calendar-input"
-					type="text"
-					bind:value={quickCalendarInput}
-					placeholder="27.5 terapia 14:00"
-					onkeydown={(event) => {
-						if (event.key === 'Enter') {
-							event.preventDefault();
-							createCalendarEntry();
-						}
-					}}
-				/>
-				<button class="reach-btn" type="button" onclick={createCalendarEntry}>
-					Lisää kalenteriin
-				</button>
-			</div>
-
-			<p class="calendar-note">
-				Concentra tekee kalenterimerkinnän valmiiksi. Hyväksyt sen kerran, ja se menee puhelimen kalenteriin.
-			</p>
-
-			{#if quickCalendarError}
-				<p class="reach-warn">{quickCalendarError}</p>
-			{:else if quickCalendarSuccess}
-				<p class="calendar-success">{quickCalendarSuccess}</p>
-			{/if}
-
-			{#if sortedCalendarEntries.length > 0}
-				<div class="calendar-list">
-					{#each sortedCalendarEntries as entry}
-						<div class="calendar-item">
-							<div class="calendar-item-copy">
-								<strong>{entry.title}</strong>
-								<span>{formatCalendarEntry(entry)}</span>
-							</div>
-							<div class="calendar-item-actions">
-								<button class="reach-btn secondary" type="button" onclick={() => redownloadCalendarEntry(entry)}>
-									Avaa uudelleen
-								</button>
-								<button class="reach-btn secondary calendar-delete" type="button" onclick={() => removeCalendarEntry(entry.id)}>
-									Poista
-								</button>
-							</div>
-						</div>
-					{/each}
-				</div>
-			{/if}
+			</details>
 		</div>
 
-		<div class="rewards locked-section">
-			<p class="rewards-hint">Tee ensin iltatoimet.</p>
-			<div class="reward-grid">
-				{#each rewards as r}
-					<div class="reward locked">{r.label}</div>
-				{/each}
-			</div>
+		<div class="rewards-locked-mini">
+			<p class="rewards-hint">Palkinnot tulevat näkyviin vasta kun ilta on hoidettu.</p>
 		</div>
 	</div>
 {/if}
@@ -1032,18 +1087,213 @@
 		to { opacity: 1; transform: translateY(0); }
 	}
 
-	/* ── Idle top ── */
-	.idle-top {
+	/* ── Hero ── */
+	.hero-block {
 		display: flex;
-		justify-content: space-between;
-		align-items: center;
+		flex-direction: column;
+		gap: 1.1rem;
+		padding: 1.25rem;
+		border-radius: 1.8rem;
+		background:
+			radial-gradient(circle at 78% 22%, rgba(141, 181, 255, 0.18), transparent 18%),
+			radial-gradient(circle at 24% 18%, rgba(255, 214, 166, 0.12), transparent 24%),
+			linear-gradient(180deg, rgba(12, 18, 31, 0.98), rgba(18, 20, 30, 0.96));
+		border: 1px solid rgba(125, 141, 179, 0.18);
+		box-shadow: 0 30px 80px rgba(0, 0, 0, 0.28);
+		overflow: hidden;
+		position: relative;
 	}
-	.idle-clock {
-		font-size: 2rem;
+
+	.hero-block[data-level='warning'],
+	.hero-block[data-level='urgent'],
+	.hero-block[data-level='overdue'] {
+		border-color: rgba(249, 115, 22, 0.22);
+	}
+
+	.hero-topbar,
+	.hero-main,
+	.hero-footer {
+		position: relative;
+		z-index: 1;
+	}
+
+	.hero-topbar {
+		display: flex;
+		align-items: flex-start;
+		justify-content: space-between;
+		gap: 1rem;
+	}
+
+	.hero-time {
+		display: flex;
+		flex-direction: column;
+		gap: 0.2rem;
+	}
+
+	.hero-clock {
+		font-size: clamp(2.5rem, 6vw, 4.6rem);
+		line-height: 0.95;
 		font-weight: 200;
 		font-variant-numeric: tabular-nums;
-		color: var(--text);
-		letter-spacing: 0.08em;
+		letter-spacing: 0.06em;
+		color: #f5f7fb;
+	}
+
+	.hero-mood {
+		font-size: 0.92rem;
+		color: rgba(225, 230, 244, 0.72);
+	}
+
+	.hero-main {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr);
+		gap: 1rem;
+	}
+
+	.hero-copy {
+		display: flex;
+		flex-direction: column;
+		gap: 0.55rem;
+		max-width: 36rem;
+	}
+
+	.hero-kicker {
+		font-size: 0.72rem;
+		font-weight: 700;
+		letter-spacing: 0.12em;
+		text-transform: uppercase;
+		color: #f2b57d;
+	}
+
+	.hero-copy h1 {
+		font-size: clamp(1.7rem, 4vw, 3rem);
+		line-height: 1.02;
+		color: #f8fbff;
+		font-weight: 650;
+		max-width: 10ch;
+	}
+
+	.hero-text {
+		font-size: 0.96rem;
+		line-height: 1.55;
+		color: rgba(228, 233, 244, 0.78);
+		max-width: 34rem;
+	}
+
+	.hero-window {
+		position: relative;
+		height: 12rem;
+		border-radius: 1.35rem;
+		background:
+			linear-gradient(180deg, rgba(31, 40, 61, 0.8), rgba(11, 14, 23, 0.88)),
+			linear-gradient(135deg, rgba(255, 255, 255, 0.05), transparent 40%);
+		border: 1px solid rgba(255, 255, 255, 0.08);
+		overflow: hidden;
+		box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+	}
+
+	.hero-window-frame {
+		position: absolute;
+		inset: 0;
+		background:
+			linear-gradient(90deg, transparent 49.5%, rgba(219, 226, 241, 0.12) 49.5%, rgba(219, 226, 241, 0.12) 50.5%, transparent 50.5%),
+			linear-gradient(180deg, transparent 49.5%, rgba(219, 226, 241, 0.12) 49.5%, rgba(219, 226, 241, 0.12) 50.5%, transparent 50.5%);
+	}
+
+	.hero-moon {
+		position: absolute;
+		top: 1.4rem;
+		right: 2rem;
+		width: 3.2rem;
+		height: 3.2rem;
+		border-radius: 50%;
+		background: radial-gradient(circle at 35% 35%, #fff8d8, #c9d8ff 55%, rgba(201, 216, 255, 0.1) 100%);
+		box-shadow: 0 0 35px rgba(201, 216, 255, 0.28);
+	}
+
+	.hero-glow {
+		position: absolute;
+		left: -8%;
+		right: -8%;
+		bottom: -20%;
+		height: 55%;
+		background: radial-gradient(circle at center, rgba(253, 171, 104, 0.18), transparent 62%);
+		filter: blur(10px);
+	}
+
+	.hero-sleep {
+		display: flex;
+		align-items: center;
+		gap: 1rem;
+		padding: 0.95rem 1rem;
+		border-radius: 1.15rem;
+		background: rgba(255, 255, 255, 0.04);
+		border: 1px solid rgba(255, 255, 255, 0.08);
+	}
+
+	.hero-sleep-value {
+		font-size: clamp(2.1rem, 7vw, 3.4rem);
+		line-height: 0.95;
+		font-weight: 200;
+		font-variant-numeric: tabular-nums;
+		background: linear-gradient(135deg, #ffffff 20%, #9cbcff 80%);
+		-webkit-background-clip: text;
+		-webkit-text-fill-color: transparent;
+		background-clip: text;
+	}
+
+	.hero-sleep-copy {
+		display: flex;
+		flex-direction: column;
+		gap: 0.28rem;
+	}
+
+	.hero-sleep-copy p {
+		font-size: 0.88rem;
+		color: rgba(228, 233, 244, 0.78);
+	}
+
+	.hero-sleep-copy span {
+		display: inline-flex;
+		align-self: flex-start;
+		padding: 0.35rem 0.75rem;
+		border-radius: 999px;
+		background: rgba(255, 255, 255, 0.06);
+		font-size: 0.76rem;
+		color: rgba(228, 233, 244, 0.72);
+	}
+
+	.hero-footer {
+		display: flex;
+		flex-direction: column;
+		gap: 0.95rem;
+		padding-top: 0.15rem;
+	}
+
+	.hero-progress {
+		display: inline-flex;
+		flex-direction: column;
+		gap: 0.2rem;
+		padding: 0.7rem 0.9rem;
+		border-radius: 1rem;
+		background: rgba(255, 255, 255, 0.04);
+		border: 1px solid rgba(255, 255, 255, 0.06);
+		align-self: flex-start;
+	}
+
+	.hero-progress strong {
+		font-size: 1.35rem;
+		color: #f2b57d;
+	}
+
+	.hero-progress span {
+		font-size: 0.82rem;
+		color: rgba(228, 233, 244, 0.72);
+	}
+
+	.hero-week {
+		justify-content: flex-start;
+		margin-top: 0;
 	}
 
 	/* ── Settings ── */
@@ -1163,95 +1413,6 @@
 		color: var(--accent);
 		font-weight: 600;
 		letter-spacing: 0.02em;
-	}
-
-	/* ── Sleep counter ── */
-	.sleep-counter {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		gap: 0.35rem;
-		padding: 2rem 1.25rem;
-		border-radius: var(--radius-xl);
-		background: var(--bg-card);
-		border: 1px solid var(--border);
-		text-align: center;
-		transition: border-color 0.8s ease, background 0.8s ease, box-shadow 0.8s ease;
-		contain: layout paint;
-	}
-	.sleep-counter[data-level='gentle'] {
-		border-color: rgba(255, 171, 64, 0.3);
-		box-shadow: 0 0 30px rgba(255, 171, 64, 0.05);
-	}
-	.sleep-counter[data-level='warning'] {
-		border-color: rgba(255, 112, 67, 0.4);
-		background: rgba(255, 112, 67, 0.06);
-		box-shadow: 0 0 40px rgba(255, 112, 67, 0.08);
-	}
-	.sleep-counter[data-level='urgent'] {
-		border-color: rgba(255, 82, 82, 0.4);
-		background: rgba(255, 82, 82, 0.08);
-		box-shadow: 0 0 40px rgba(255, 82, 82, 0.1);
-	}
-	.sleep-counter[data-level='overdue'] {
-		border-color: rgba(224, 64, 251, 0.4);
-		background: rgba(224, 64, 251, 0.08);
-		box-shadow: 0 0 40px rgba(224, 64, 251, 0.1);
-	}
-	.sleep-num {
-		font-size: 4rem;
-		font-weight: 100;
-		font-variant-numeric: tabular-nums;
-		line-height: 1;
-		background: linear-gradient(135deg, #ffffff 20%, #7eb2ff 80%);
-		-webkit-background-clip: text;
-		-webkit-text-fill-color: transparent;
-		background-clip: text;
-		filter: drop-shadow(0 0 20px rgba(126, 178, 255, 0.15));
-	}
-	.sleep-label {
-		font-size: 0.82rem;
-		color: var(--text-muted);
-		letter-spacing: 0.03em;
-	}
-	.deadline-row {
-		font-size: 0.75rem;
-		color: var(--text-muted);
-		margin-top: 0.5rem;
-		padding: 0.3rem 0.8rem;
-		background: var(--field);
-		border-radius: 2rem;
-	}
-
-	/* ── Progress (kumulatiivinen) ── */
-	.progress-block {
-		text-align: center;
-		padding: 1.5rem 0 0.5rem;
-	}
-
-	.total-num {
-		font-size: 4.5rem;
-		font-weight: 800;
-		line-height: 1;
-		background: linear-gradient(135deg, var(--accent) 0%, #fbbf24 100%);
-		-webkit-background-clip: text;
-		-webkit-text-fill-color: transparent;
-		background-clip: text;
-		filter: drop-shadow(0 0 20px var(--accent-glow));
-	}
-
-	.total-label {
-		font-size: 0.9rem;
-		color: var(--text-muted);
-		margin-top: 0.4rem;
-		letter-spacing: 0.03em;
-	}
-
-	.first-time {
-		font-size: 1.15rem;
-		color: var(--text-dim);
-		padding: 1.5rem 0;
-		font-weight: 300;
 	}
 
 	.week {
@@ -1789,6 +1950,68 @@
 		color: var(--text-muted);
 	}
 
+	.utility-stack {
+		display: flex;
+		flex-direction: column;
+		gap: 0.9rem;
+	}
+
+	.utility-panel {
+		border-radius: var(--radius-xl);
+		background: rgba(255, 255, 255, 0.025);
+		border: 1px solid var(--border);
+		overflow: hidden;
+	}
+
+	.utility-panel summary {
+		list-style: none;
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 1rem;
+		padding: 1rem 1.1rem;
+		cursor: pointer;
+	}
+
+	.utility-panel summary::-webkit-details-marker {
+		display: none;
+	}
+
+	.utility-summary-copy {
+		display: flex;
+		flex-direction: column;
+		gap: 0.18rem;
+	}
+
+	.utility-kicker {
+		font-size: 0.68rem;
+		font-weight: 700;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		color: var(--accent);
+	}
+
+	.utility-summary-copy strong,
+	.utility-summary-meta {
+		font-size: 0.88rem;
+		color: var(--text);
+	}
+
+	.utility-summary-meta {
+		color: var(--text-muted);
+	}
+
+	.utility-panel-body {
+		padding: 0 1rem 1rem;
+	}
+
+	.rewards-locked-mini {
+		padding: 1rem 1.1rem;
+		border-radius: var(--radius-xl);
+		background: rgba(255, 255, 255, 0.02);
+		border: 1px dashed rgba(255, 255, 255, 0.08);
+	}
+
 	/* ── Rewards ── */
 	.rewards-hint {
 		font-size: 0.78rem;
@@ -1820,11 +2043,6 @@
 	.reward:active {
 		border-color: var(--accent);
 		transform: scale(0.97);
-	}
-
-	.reward.locked {
-		color: var(--text-muted);
-		opacity: 0.25;
 	}
 
 	/* ── Soundscape / Spotify ── */
@@ -2132,54 +2350,53 @@
 			align-items: start;
 		}
 
-		.idle-top,
+		.hero-block,
 		.settings-panel,
-		.iphone-setup-block,
-		.calendar-capture-block,
-		.rewards.locked-section {
+		.utility-stack,
+		.rewards-locked-mini {
 			grid-column: 1 / -1;
 		}
 
-		.sleep-counter,
 		.mode-block {
 			grid-column: 1;
 		}
 
-		.progress-block,
 		.checklist {
 			grid-column: 2;
 		}
 
-		.idle-top {
-			display: flex;
-			justify-content: space-between;
-			align-items: center;
-			padding-top: 0.35rem;
+		.hero-block {
+			padding: 1.6rem 1.7rem;
 		}
 
-		.idle-clock {
-			font-size: 2.4rem;
+		.hero-main {
+			grid-template-columns: minmax(0, 1.1fr) minmax(300px, 0.9fr);
+			align-items: end;
+		}
+
+		.hero-window {
+			height: 15.5rem;
+		}
+
+		.hero-footer {
+			flex-direction: row;
+			align-items: flex-end;
+			justify-content: space-between;
+			gap: 1.5rem;
+		}
+
+		.hero-week {
+			justify-content: flex-end;
 		}
 
 		.settings-panel,
-		.sleep-counter,
-		.progress-block,
-		.iphone-setup-block,
-		.calendar-capture-block,
-		.rewards.locked-section,
-		.checklist {
+		.checklist,
+		.rewards-locked-mini,
+		.utility-panel {
 			background: var(--bg-card);
 			border: 1px solid var(--border);
 			border-radius: var(--radius-xl);
 			box-shadow: 0 24px 80px rgba(0, 0, 0, 0.22);
-		}
-
-		.progress-block {
-			padding: 1.75rem 1.25rem;
-			min-height: 100%;
-			display: flex;
-			flex-direction: column;
-			justify-content: center;
 		}
 
 		.checklist {
@@ -2194,10 +2411,19 @@
 			font-size: 1rem;
 		}
 
+		.utility-stack {
+			display: grid;
+			grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+			gap: 1.1rem;
+		}
+
+		.utility-panel {
+			height: 100%;
+		}
+
 		.iphone-setup-block,
-		.calendar-capture-block,
-		.rewards.locked-section {
-			padding: 1.45rem;
+		.calendar-capture-block {
+			padding: 1.2rem;
 		}
 
 		.iphone-setup-block {
@@ -2290,11 +2516,6 @@
 		.calendar-capture-block .calendar-compose .reach-btn {
 			flex: 0 0 210px;
 		}
-		
-		.rewards.locked-section .reward-grid,
-		.page > .rewards:not(.locked-section) .reward-grid {
-			grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-		}
 
 		.page > .done-top,
 		.page > .rewards:not(.locked-section),
@@ -2329,6 +2550,31 @@
 	}
 
 	@media (max-width: 640px) {
+		.hero-block {
+			padding: 1.05rem;
+			border-radius: 1.4rem;
+		}
+
+		.hero-window {
+			height: 8.75rem;
+		}
+
+		.hero-footer {
+			gap: 0.75rem;
+		}
+
+		.hero-week {
+			justify-content: center;
+		}
+
+		.utility-panel summary {
+			padding: 0.9rem 0.95rem;
+		}
+
+		.utility-panel-body {
+			padding: 0 0.8rem 0.8rem;
+		}
+
 		.calendar-item-actions {
 			flex-direction: column;
 		}
