@@ -698,19 +698,32 @@
 
 		<div class="mode-block">
 			<div class="mode-copy">
-				<p class="mode-kicker">Illan paketti</p>
-				<h2>Tee yksi asia kerrallaan</h2>
+				<p class="mode-kicker">Yksi asia nyt</p>
+				<h2>Älä mieti koko listaa</h2>
 				<p class="mode-text">
 					{#if criticalOnly}
 						Myöhä on jo, joten keskity vain tärkeimpiin. Täydellinen ilta ei ole vaatimus.
 					{:else}
-						Kaikki apu on tässä samassa näkymässä. Sinun ei tarvitse valita mitään tilaa ennen aloittamista.
+						Tee vain tämä yksi asia ensin. Muut voivat odottaa.
 					{/if}
 				</p>
-				{#if nextTask}
-					<p class="mode-text"><b>Aloita tästä:</b> {nextTask.label}</p>
-				{/if}
 			</div>
+
+			{#if nextTask}
+				<div class="next-task-panel">
+					<p class="next-task-kicker">Seuraava asia</p>
+					<h3>{nextTask.label}</h3>
+					<p class="next-task-meta">{remaining.length} {remaining.length === 1 ? 'asia' : 'asiaa'} jäljellä</p>
+					<button class="next-task-btn" type="button" onclick={() => completeTask(nextTask.id)}>
+						Tehty
+					</button>
+				</div>
+			{:else}
+				<div class="next-task-panel next-task-panel-done">
+					<p class="next-task-kicker">Valmis</p>
+					<h3>Kaikki tämän näkymän asiat on tehty</h3>
+				</div>
+			{/if}
 		</div>
 
 		<div class="checklist">
@@ -1324,6 +1337,59 @@
 		font-size: 0.86rem;
 		line-height: 1.45;
 		color: var(--text-muted);
+	}
+
+	.next-task-panel {
+		display: flex;
+		flex-direction: column;
+		gap: 0.75rem;
+		padding: 1rem;
+		border-radius: var(--radius-lg);
+		background: linear-gradient(180deg, rgba(249, 115, 22, 0.14), rgba(249, 115, 22, 0.05));
+		border: 1px solid rgba(249, 115, 22, 0.24);
+	}
+
+	.next-task-kicker {
+		font-size: 0.72rem;
+		font-weight: 700;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		color: var(--accent);
+	}
+
+	.next-task-panel h3 {
+		font-size: 1.45rem;
+		line-height: 1.1;
+		color: var(--text);
+	}
+
+	.next-task-meta {
+		font-size: 0.84rem;
+		color: var(--text-muted);
+	}
+
+	.next-task-btn {
+		width: 100%;
+		padding: 1rem 1.1rem;
+		border: none;
+		border-radius: var(--radius-md);
+		background: var(--accent);
+		color: #fff;
+		font: inherit;
+		font-size: 1rem;
+		font-weight: 700;
+		cursor: pointer;
+		transition: transform 0.15s, opacity 0.15s;
+	}
+
+	.next-task-btn:active {
+		transform: scale(0.985);
+		opacity: 0.92;
+	}
+
+	.next-task-panel-done {
+		background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.03));
+		border-color: var(--border);
 	}
 
 	/* ── Checklist ── */
