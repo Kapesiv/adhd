@@ -49,7 +49,8 @@
 	const distractionOptions = ['TikTok', 'Instagram', 'Reddit', 'YouTube', 'Safari', 'X'];
 	// --- State ---
 	let now = new Date();
-	const timer = setInterval(() => (now = new Date()), 1000);
+	let minuteTickTimeout: ReturnType<typeof setTimeout> | null = null;
+	let minuteTickInterval: ReturnType<typeof setInterval> | null = null;
 	let audioReady = false;
 	let showSettings = false;
 	let showHelp = false;
@@ -69,7 +70,21 @@
 
 	let level: IntensityLevel = 'calm';
 
+	function updateNow() {
+		now = new Date();
+	}
+
+	function startMinuteClock() {
+		updateNow();
+		const msUntilNextMinute = 60000 - (now.getSeconds() * 1000 + now.getMilliseconds());
+		minuteTickTimeout = setTimeout(() => {
+			updateNow();
+			minuteTickInterval = setInterval(updateNow, 60000);
+		}, msUntilNextMinute + 20);
+	}
+
 	onMount(() => {
+		startMinuteClock();
 		const s = $iltavahti;
 		if (isTodayDone(s.completedDays ?? [])) {
 			mode = 'done';
@@ -77,7 +92,8 @@
 	});
 
 	onDestroy(() => {
-		clearInterval(timer);
+		if (minuteTickTimeout) clearTimeout(minuteTickTimeout);
+		if (minuteTickInterval) clearInterval(minuteTickInterval);
 	});
 
 	// Intensiteetti: laske jokaisella tikityksella
@@ -1039,11 +1055,11 @@
 		flex-direction: column;
 		gap: 0.85rem;
 		background: var(--bg-card);
-		backdrop-filter: blur(20px);
 		border: 1px solid var(--border);
 		border-radius: var(--radius-xl);
 		padding: 1.25rem;
 		animation: slideDown 0.25s ease;
+		contain: layout paint;
 	}
 
 	.onboarding-link {
@@ -1145,10 +1161,10 @@
 		padding: 2rem 1.25rem;
 		border-radius: var(--radius-xl);
 		background: var(--bg-card);
-		backdrop-filter: blur(20px);
 		border: 1px solid var(--border);
 		text-align: center;
 		transition: border-color 0.8s ease, background 0.8s ease, box-shadow 0.8s ease;
+		contain: layout paint;
 	}
 	.sleep-counter[data-level='gentle'] {
 		border-color: rgba(255, 171, 64, 0.3);
@@ -1281,8 +1297,8 @@
 		padding: 1.15rem 1.2rem;
 		border-radius: var(--radius-xl);
 		background: var(--bg-card);
-		backdrop-filter: blur(20px);
 		border: 1px solid var(--border);
+		contain: layout paint;
 	}
 
 	.mode-block {
@@ -1315,6 +1331,7 @@
 		display: flex;
 		flex-direction: column;
 		gap: 0.5rem;
+		contain: layout paint;
 	}
 
 	.check-item {
@@ -1324,7 +1341,6 @@
 		padding: 1.1rem 1.2rem;
 		border-radius: var(--radius-md);
 		background: var(--bg-card);
-		backdrop-filter: blur(10px);
 		border: 1px solid var(--border);
 		color: var(--text);
 		font-size: 0.95rem;
@@ -1415,8 +1431,8 @@
 		padding: 1.25rem;
 		border-radius: var(--radius-xl);
 		background: linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.03));
-		backdrop-filter: blur(20px);
 		border: 1px solid var(--border);
+		contain: layout paint;
 	}
 
 	.iphone-setup-block.setup-summary {
@@ -1616,8 +1632,8 @@
 		padding: 1.25rem;
 		border-radius: var(--radius-xl);
 		background: linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.03));
-		backdrop-filter: blur(20px);
 		border: 1px solid var(--border);
+		contain: layout paint;
 	}
 
 	.calendar-head {
@@ -1730,7 +1746,6 @@
 		font-weight: 500;
 		text-decoration: none;
 		background: var(--bg-card);
-		backdrop-filter: blur(10px);
 		border: 1px solid var(--border);
 		color: var(--text);
 		transition: border-color 0.2s, transform 0.15s;
@@ -1754,8 +1769,8 @@
 		padding: 1.25rem;
 		border-radius: var(--radius-xl);
 		background: linear-gradient(180deg, rgba(30, 215, 96, 0.06), rgba(30, 215, 96, 0.02));
-		backdrop-filter: blur(20px);
 		border: 1px solid rgba(30, 215, 96, 0.15);
+		contain: layout paint;
 	}
 
 	.soundscape-kicker {
@@ -1944,7 +1959,6 @@
 		border: 1px solid rgb(249 115 22 / 0.35);
 		background: rgb(20 24 31 / 0.92);
 		color: var(--text);
-		backdrop-filter: blur(10px);
 		box-shadow: 0 10px 30px rgb(0 0 0 / 0.25);
 		cursor: pointer;
 		font-size: 0.88rem;
@@ -1972,7 +1986,6 @@
 		background: rgb(19 24 34 / 0.96);
 		border: 1px solid rgb(249 115 22 / 0.2);
 		box-shadow: 0 20px 60px rgb(0 0 0 / 0.34);
-		backdrop-filter: blur(14px);
 		pointer-events: auto;
 	}
 
@@ -2092,7 +2105,6 @@
 			background: var(--bg-card);
 			border: 1px solid var(--border);
 			border-radius: var(--radius-xl);
-			backdrop-filter: blur(20px);
 			box-shadow: 0 24px 80px rgba(0, 0, 0, 0.22);
 		}
 
